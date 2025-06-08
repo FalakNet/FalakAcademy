@@ -379,14 +379,6 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
           </div>
         </div>
       )}
-
-      {certificate.courses.certificate_template_url && (
-        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-sm text-blue-800 dark:text-blue-200">
-            <strong>Custom Template:</strong> This course uses a custom certificate template with personalized settings.
-          </p>
-        </div>
-      )}
       
       <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
         <button
