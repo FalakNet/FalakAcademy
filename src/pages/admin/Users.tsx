@@ -4,7 +4,7 @@ import { supabase, Profile, UserRole } from '../../lib/supabase';
 import { Users, Crown, Shield, User, Edit2, Trash2, Plus, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 
 export default function AdminUsers() {
-  const { profile, isSuperAdmin } = useAuth();
+  const { profile, isSuperAdmin, session, refreshProfile } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
@@ -18,9 +18,18 @@ export default function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
-    if (isSuperAdmin()) {
-      loadUsers();
-    }
+    const initializeComponent = async () => {
+      // Refresh the user's profile to ensure we have the latest role information
+      await refreshProfile();
+      
+      if (isSuperAdmin()) {
+        loadUsers();
+      } else {
+        setLoading(false);
+      }
+    };
+
+    initializeComponent();
   }, [profile]);
 
   const loadUsers = async () => {
@@ -63,41 +72,143 @@ export default function AdminUsers() {
       return;
     }
 
-    try {
-      const { error } = await supabase.auth.admin.deleteUser(userId);
-      if (error) throw error;
+    console.log('🚀 STARTING USER DELETION PROCESS');
+    console.log('📋 Target User ID:', userId);
+    console.log('👤 Current User ID:', profile?.id);
+    console.log('🔑 Current User Role:', profile?.role);
 
-      setUsers(users.filter(user => user.id !== userId));
+    try {
+      // Refresh profile before attempting deletion to ensure we have the latest role
+      await refreshProfile();
+      
+      // Double-check permissions after refresh
+      if (!isSuperAdmin()) {
+        alert('You do not have permission to delete users. Please contact a superadmin.');
+        return;
+      }
+
+      // Step 1: Verify user exists in database before deletion
+      console.log('🔍 STEP 1: Checking if user exists in database...');
+      const { data: userCheck, error: userCheckError } = await supabase
+        .from('profiles')
+        .select('id, name, email, role')
+        .eq('id', userId)
+        .single();
+
+      if (userCheckError) {
+        console.error('❌ User check failed:', userCheckError);
+        throw new Error(`User not found: ${userCheckError.message}`);
+      }
+
+      console.log('✅ User found in database:', userCheck);
+
+      // Step 2: Call the delete-user Edge Function
+      console.log('🗑️ STEP 2: Calling delete-user Edge Function...');
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`;
+      
+      // Use the authenticated user's session token instead of the anonymous key
+      if (!session?.access_token) {
+        throw new Error('No valid session token available');
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ userId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error('❌ Edge Function call failed:', response.status, errorData);
+        throw new Error(`Failed to delete user: ${response.status} ${errorData}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Edge Function response:', result);
+
+      // Step 3: Update local state
+      console.log('🔄 STEP 3: Updating local state...');
+      const originalUsersCount = users.length;
+      const newUsers = users.filter(user => user.id !== userId);
+      setUsers(newUsers);
+      
+      console.log('📊 Users count before:', originalUsersCount);
+      console.log('📊 Users count after:', newUsers.length);
+      console.log('✅ Local state updated successfully');
+
+      // Step 4: Reload users from database to verify
+      console.log('🔄 STEP 4: Reloading users from database to verify...');
+      await loadUsers();
+      
+      console.log('🎉 USER DELETION COMPLETED SUCCESSFULLY');
+      alert('User deleted successfully');
+
     } catch (error) {
-      console.error('Error deleting user:', error);
-      alert('Failed to delete user');
+      console.error('💥 USER DELETION FAILED:', error);
+      console.error('📋 Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Reload users to ensure UI is in sync with database
+      console.log('🔄 Reloading users to sync UI with database...');
+      await loadUsers();
+      
+      alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
   const createUser = async () => {
     try {
+      // Generate a temporary password
+      const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+      
       const { data, error } = await supabase.auth.admin.createUser({
         email: newUser.email,
-        password: 'temppassword123',
-        email_confirm: true
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          name: newUser.name
+        }
       });
 
       if (error) throw error;
 
       if (data.user) {
-        await supabase.from('profiles').insert({
+        // Create the profile
+        const { error: profileError } = await supabase.from('profiles').insert({
           id: data.user.id,
           name: newUser.name,
+          email: newUser.email,
           role: newUser.role
         });
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          // Try to clean up the auth user if profile creation failed
+          try {
+            await supabase.auth.admin.deleteUser(data.user.id);
+          } catch (cleanupError) {
+            console.warn('Could not clean up auth user after profile creation failure:', cleanupError);
+          }
+          throw profileError;
+        }
 
         loadUsers();
         setShowCreateModal(false);
         setNewUser({ name: '', email: '', role: 'USER' });
+        
+        alert(`User created successfully with temporary password: ${tempPassword}\nPlease share this password securely with the user.`);
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      alert('Failed to create user');
+      alert(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -415,63 +526,6 @@ export default function AdminUsers() {
               : 'No users have been created yet.'
             }
           </p>
-        </div>
-      )}
-
-      {/* Create User Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold mb-4">Create New User</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                  <input
-                    type="text"
-                    value={newUser.name}
-                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                  <select
-                    value={newUser.role}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="USER">User</option>
-                    <option value="COURSE_ADMIN">Course Admin</option>
-                    <option value="SUPERADMIN">Superadmin</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createUser}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  Create User
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

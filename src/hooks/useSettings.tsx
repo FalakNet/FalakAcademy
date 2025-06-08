@@ -53,8 +53,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     const body = document.body;
     
-    console.log('Applying theme:', theme);
-    
     // Remove existing theme classes
     root.classList.remove('light', 'dark');
     body.classList.remove('light', 'dark');
@@ -73,10 +71,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     
     // Save to localStorage
     localStorage.setItem('theme', theme);
-    
-    console.log('Theme applied successfully:', theme);
-    console.log('Root classes:', root.className);
-    console.log('Body classes:', body.className);
   }, [theme, isInitialized]);
 
   // Apply colorblind filters
@@ -136,7 +130,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   // Wrapper functions to update state and localStorage
   const setTheme = (newTheme: Theme) => {
-    console.log('setTheme called with:', newTheme);
     setThemeState(newTheme);
   };
 

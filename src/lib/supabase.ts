@@ -3,12 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Enhanced validation and debugging
-console.log('Supabase Configuration:');
-console.log('URL:', supabaseUrl);
-console.log('Anon Key exists:', !!supabaseAnonKey);
-console.log('Anon Key length:', supabaseAnonKey?.length || 0);
-
 if (!supabaseUrl || !supabaseAnonKey) {
   const missingVars = [];
   if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
@@ -54,7 +48,7 @@ supabase.auth.getSession().then(({ data, error }) => {
   if (error) {
     console.error('Supabase auth connection test failed:', error);
   } else {
-    console.log('Supabase connection established successfully');
+    console.log('200 OK');
   }
 }).catch((error) => {
   console.error('Supabase connection test error:', error);

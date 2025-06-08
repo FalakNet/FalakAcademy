@@ -10,6 +10,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   hasRole: (role: UserRole) => boolean;
   isAdmin: () => boolean;
   isSuperAdmin: () => boolean;
@@ -54,24 +55,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loadProfile = async (userId: string) => {
     try {
-      // Test Supabase connection first
-      console.log('Testing Supabase connection...');
-      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-      console.log('Supabase Anon Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-      
-      // Try a simple health check first
-      const { data: healthCheck, error: healthError } = await supabase
-        .from('profiles')
-        .select('count')
-        .limit(1);
-      
-      if (healthError) {
-        console.error('Supabase health check failed:', healthError);
-        throw new Error(`Supabase connection failed: ${healthError.message}`);
-      }
-      
-      console.log('Supabase connection successful, loading profile...');
-      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -80,7 +63,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error && error.code === 'PGRST116') {
         // Profile doesn't exist, create one
-        console.log('Profile not found, creating new profile...');
         const { data: newProfile, error: createError } = await supabase
           .from('profiles')
           .insert({
@@ -93,31 +75,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
 
         if (createError) {
-          console.error('Error creating profile:', createError);
           throw createError;
         }
 
-        console.log('Profile created successfully:', newProfile);
         setProfile(newProfile);
       } else if (error) {
-        console.error('Error fetching profile:', error);
         throw error;
       } else {
-        console.log('Profile loaded successfully:', data);
         setProfile(data);
       }
     } catch (error) {
-      console.error('Error loading profile:', error);
-      
-      // Provide more specific error information
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        console.error('Network error details:');
-        console.error('- Check if Supabase URL is correct:', import.meta.env.VITE_SUPABASE_URL);
-        console.error('- Check if you have internet connectivity');
-        console.error('- Check if Supabase project is active and not paused');
-        console.error('- Check browser network tab for CORS or other network errors');
-      }
-      
       // Set a default profile to prevent app from breaking
       setProfile({
         id: userId,
@@ -129,6 +96,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshProfile = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error refreshing profile:', error);
+        return;
+      }
+
+      setProfile(data);
+    } catch (error) {
+      console.error('Error refreshing profile:', error);
     }
   };
 
@@ -158,7 +146,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       }
     } catch (error) {
-      console.error('Sign up error:', error);
       throw error;
     }
   };
@@ -172,7 +159,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (error) throw error;
     } catch (error) {
-      console.error('Sign in error:', error);
       throw error;
     }
   };
@@ -184,7 +170,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // If refresh fails or returns no session, the session is already invalid
       if (refreshError || !refreshData.session) {
-        console.warn('Session already expired or invalid, clearing local state');
         // Clear local state without calling signOut on server
         setSession(null);
         setUser(null);
@@ -200,7 +185,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (error.message?.includes('session_not_found') || 
             error.message?.includes('Session from session_id claim in JWT does not exist') ||
             error.message?.includes('Auth session missing!')) {
-          console.warn('Session already expired or not found, clearing local state');
           // Clear local state since session is already gone
           setSession(null);
           setUser(null);
@@ -211,7 +195,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       // If any unexpected error occurs, still clear local state
-      console.warn('Error during signOut, clearing local state:', error);
       setSession(null);
       setUser(null);
       setProfile(null);
@@ -238,6 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signUp,
     signIn,
     signOut,
+    refreshProfile,
     hasRole,
     isAdmin,
     isSuperAdmin,

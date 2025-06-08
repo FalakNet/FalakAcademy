@@ -107,15 +107,15 @@ export default function Layout({ children }: LayoutProps) {
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex flex-col h-full">
-          {/* Logo - Same for all users with proper contrast */}
-          <div className="flex items-center justify-between h-16 px-4 bg-blue-600 dark:bg-blue-700">
-            <div className="flex items-center">
-              <BookOpen className="w-8 h-8 text-white mr-2" />
-              <h1 className="text-xl font-bold text-white">Falak Academy</h1>
+          {/* Header - Hide logo on mobile */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="hidden lg:flex items-center">
+              <BookOpen className="w-8 h-8 text-blue-600 mr-3" />
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Falak Academy</h1>
             </div>
             <button
               onClick={closeSidebar}
-              className="lg:hidden text-white hover:text-gray-200"
+              className="lg:hidden text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white ml-auto"
             >
               <X className="w-6 h-6" />
             </button>
@@ -158,12 +158,17 @@ export default function Layout({ children }: LayoutProps) {
               </div>
               <div className="ml-3 flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{profile?.name}</p>
-                <div className="flex items-center">
+                {/* Hide role icon on mobile */}
+                <div className="hidden lg:flex items-center">
                   {getRoleIcon()}
                   <p className={`text-xs ml-1 capitalize truncate ${getRoleColor()}`}>
                     {profile?.role.toLowerCase().replace('_', ' ')}
                   </p>
                 </div>
+                {/* Show role text only on mobile */}
+                <p className={`lg:hidden text-xs capitalize truncate ${getRoleColor()}`}>
+                  {profile?.role.toLowerCase().replace('_', ' ')}
+                </p>
               </div>
             </div>
 

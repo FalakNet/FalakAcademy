@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase, Course, Profile } from '../../lib/supabase';
-import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X } from 'lucide-react';
+import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CertificateTemplateManager from '../../components/CertificateTemplateManager';
 
@@ -12,6 +12,8 @@ export default function AdminCourses() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState<Course | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState<Course | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
@@ -98,23 +100,140 @@ export default function AdminCourses() {
     }
   };
 
-  const deleteCourse = async (courseId: string) => {
-    if (!confirm('Are you sure you want to delete this course? This action cannot be undone.')) {
-      return;
-    }
+  const deleteCourse = async (course: Course) => {
+    if (!course) return;
 
+    setDeleting(true);
     try {
-      const { error } = await supabase
+      // Delete content completions first (references section_content)
+      const { data: sections } = await supabase
+        .from('course_sections')
+        .select('id')
+        .eq('course_id', course.id);
+
+      if (sections && sections.length > 0) {
+        const sectionIds = sections.map(s => s.id);
+        
+        // Get all content IDs for these sections
+        const { data: contentItems } = await supabase
+          .from('section_content')
+          .select('id')
+          .in('section_id', sectionIds);
+
+        if (contentItems && contentItems.length > 0) {
+          const contentIds = contentItems.map(c => c.id);
+          
+          // Delete content completions
+          await supabase
+            .from('content_completions')
+            .delete()
+            .in('content_id', contentIds);
+        }
+      }
+
+      // Delete quiz attempts and questions
+      const { data: quizzes } = await supabase
+        .from('quizzes')
+        .select('id')
+        .eq('course_id', course.id);
+
+      if (quizzes && quizzes.length > 0) {
+        const quizIds = quizzes.map(q => q.id);
+        
+        // Delete quiz attempts
+        await supabase
+          .from('quiz_attempts')
+          .delete()
+          .in('quiz_id', quizIds);
+
+        // Delete questions
+        await supabase
+          .from('questions')
+          .delete()
+          .in('quiz_id', quizIds);
+      }
+
+      // Delete section content
+      if (sections && sections.length > 0) {
+        const sectionIds = sections.map(s => s.id);
+        
+        await supabase
+          .from('section_content')
+          .delete()
+          .in('section_id', sectionIds);
+      }
+
+      // Delete course sections
+      await supabase
+        .from('course_sections')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Delete quizzes
+      await supabase
+        .from('quizzes')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Delete materials
+      await supabase
+        .from('materials')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Delete certificates
+      await supabase
+        .from('certificates')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Delete course completions
+      await supabase
+        .from('course_completions')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Delete assignments
+      await supabase
+        .from('assignments')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Delete course admins
+      await supabase
+        .from('course_admins')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Delete enrollments
+      await supabase
+        .from('enrollments')
+        .delete()
+        .eq('course_id', course.id);
+
+      // Finally, delete the course itself
+      const { error: courseError } = await supabase
         .from('courses')
         .delete()
-        .eq('id', courseId);
+        .eq('id', course.id);
 
-      if (error) throw error;
+      if (courseError) {
+        throw new Error(`Failed to delete course: ${courseError.message}`);
+      }
 
-      setCourses(courses.filter(course => course.id !== courseId));
+      // Reload courses from database to ensure UI is accurate
+      await loadCourses();
+      
+      setShowDeleteModal(null);
+      
+      alert(`Course "${course.title}" and all related data have been successfully deleted.`);
     } catch (error) {
-      console.error('Error deleting course:', error);
-      alert('Failed to delete course');
+      alert(`Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Reload courses to ensure UI is in sync with database
+      await loadCourses();
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -140,6 +259,11 @@ export default function AdminCourses() {
     setCourses(courses.map(course => 
       course.id === updatedCourse.id ? updatedCourse : course
     ));
+  };
+
+  const canDeleteCourse = (course: Course): boolean => {
+    // Only superadmins and course creators can delete courses
+    return profile?.role === 'SUPERADMIN' || course.created_by === profile?.id;
   };
 
   if (!isAdmin()) {
@@ -258,13 +382,15 @@ export default function AdminCourses() {
                     <Award className="w-4 h-4" />
                   </button>
                 </div>
-                <button
-                  onClick={() => deleteCourse(course.id)}
-                  className="text-red-600 hover:text-red-800"
-                  title="Delete course"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {canDeleteCourse(course) && (
+                  <button
+                    onClick={() => setShowDeleteModal(course)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Delete course"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -402,6 +528,67 @@ export default function AdminCourses() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 order-1 sm:order-2"
                 >
                   Update Course
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Course Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Delete Course</h3>
+                  <p className="text-sm text-gray-600">This action cannot be undone</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  Are you sure you want to delete <strong>"{showDeleteModal.title}"</strong>?
+                </p>
+                
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-800 mb-2">This will permanently delete:</h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    <li>• All course content and sections</li>
+                    <li>• All student enrollments and progress</li>
+                    <li>• All quizzes and quiz attempts</li>
+                    <li>• All course materials</li>
+                    <li>• All certificates issued for this course</li>
+                    <li>• All related data and analytics</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
+                <button
+                  onClick={() => setShowDeleteModal(null)}
+                  disabled={deleting}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 order-2 sm:order-1 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteCourse(showDeleteModal)}
+                  disabled={deleting}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    'Delete Course'
+                  )}
                 </button>
               </div>
             </div>
