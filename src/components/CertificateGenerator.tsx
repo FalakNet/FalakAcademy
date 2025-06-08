@@ -356,20 +356,6 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400 mr-3" />
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{certificate.courses.title}</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Certificate #{certificate.certificate_number}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-600 dark:text-gray-400">Issued</p>
-          <p className="font-medium text-gray-900 dark:text-white">{new Date(certificate.issued_at).toLocaleDateString()}</p>
-        </div>
-      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -399,6 +385,5 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
           )}
         </button>
       </div>
-    </div>
   );
 }
