@@ -1,0 +1,5 @@
+*.config.ts
+*.config.js
+src/AvailableCourses.tsx
+src/Login.tsx
+src/Signup.tsx
