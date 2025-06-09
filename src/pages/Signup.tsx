@@ -14,7 +14,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   
   const { user, signUp } = useAuth();
-  const { settings } = usePlatformSettings();
+  const { settings, getAssetUrl } = usePlatformSettings();
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -22,7 +22,7 @@ export default function Signup() {
 
   // If public registration is disabled, redirect to login
   if (!settings.allow_public_registration) {
-    return <Navigate to="/login\" replace />;
+    return <Navigate to="/login" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,6 +55,9 @@ export default function Signup() {
     { text: 'Passwords match', met: password === confirmPassword && password.length > 0 }
   ];
 
+  const logoUrl = getAssetUrl(settings.site_logo_url);
+  const splashImageUrl = getAssetUrl(settings.login_splash_image_url);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex">
       {/* Left Side - Branding & Benefits */}
@@ -64,10 +67,10 @@ export default function Signup() {
         <div className="absolute inset-0 bg-black bg-opacity-20" />
         
         {/* Background Image Overlay */}
-        {settings.login_splash_image_url && (
+        {splashImageUrl && (
           <div 
             className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
-            style={{ backgroundImage: `url(${settings.login_splash_image_url})` }}
+            style={{ backgroundImage: `url(${splashImageUrl})` }}
           />
         )}
         
@@ -76,9 +79,9 @@ export default function Signup() {
           {/* Logo & Brand */}
           <div className="mb-12">
             <div className="flex items-center mb-6">
-              {settings.site_logo_url ? (
+              {logoUrl ? (
                 <img 
-                  src={settings.site_logo_url} 
+                  src={logoUrl} 
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-4"
                 />
@@ -156,9 +159,9 @@ export default function Signup() {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              {settings.site_logo_url ? (
+              {logoUrl ? (
                 <img 
-                  src={settings.site_logo_url} 
+                  src={logoUrl} 
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-3"
                 />

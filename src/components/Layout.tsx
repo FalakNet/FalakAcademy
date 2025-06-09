@@ -24,7 +24,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { profile, signOut, isAdmin, isSuperAdmin } = useAuth();
-  const { settings } = usePlatformSettings();
+  const { settings, getAssetUrl } = usePlatformSettings();
   const location = useLocation();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -94,6 +94,8 @@ export default function Layout({ children }: LayoutProps) {
 
   const closeSidebar = () => setSidebarOpen(false);
 
+  const logoUrl = getAssetUrl(settings.site_logo_url);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Mobile overlay */}
@@ -112,9 +114,9 @@ export default function Layout({ children }: LayoutProps) {
           {/* Header - Hide logo on mobile */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="hidden lg:flex items-center">
-              {settings.site_logo_url ? (
+              {logoUrl ? (
                 <img 
-                  src={settings.site_logo_url} 
+                  src={logoUrl} 
                   alt={settings.site_name}
                   className="w-8 h-8 mr-3 object-contain"
                 />
@@ -218,9 +220,9 @@ export default function Layout({ children }: LayoutProps) {
               <Menu className="w-6 h-6" />
             </button>
             <div className="flex items-center">
-              {settings.site_logo_url ? (
+              {logoUrl ? (
                 <img 
-                  src={settings.site_logo_url} 
+                  src={logoUrl} 
                   alt={settings.site_name}
                   className="w-6 h-6 mr-2 object-contain"
                 />

@@ -24,6 +24,7 @@ interface PlatformSettingsContextType {
   settings: PlatformSettings;
   loading: boolean;
   refreshSettings: () => Promise<void>;
+  getAssetUrl: (path: string | null) => string | null;
 }
 
 const defaultSettings: PlatformSettings = {
@@ -50,6 +51,22 @@ const PlatformSettingsContext = createContext<PlatformSettingsContextType | unde
 export function PlatformSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<PlatformSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
+
+  const getAssetUrl = (path: string | null): string | null => {
+    if (!path) return null;
+    
+    // If it's already a full URL, return as is
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    
+    // Get public URL from Supabase storage
+    const { data } = supabase.storage
+      .from('platform-assets')
+      .getPublicUrl(path);
+    
+    return data.publicUrl;
+  };
 
   const loadSettings = async () => {
     try {
@@ -121,14 +138,15 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
       document.title = settings.site_name;
       
       // Update favicon if provided
-      if (settings.site_favicon_url) {
+      const faviconUrl = getAssetUrl(settings.site_favicon_url);
+      if (faviconUrl) {
         let favicon = document.querySelector('link[rel="icon"]') as HTMLLinkElement;
         if (!favicon) {
           favicon = document.createElement('link');
           favicon.rel = 'icon';
           document.head.appendChild(favicon);
         }
-        favicon.href = settings.site_favicon_url;
+        favicon.href = faviconUrl;
       }
     }
   }, [settings, loading]);
@@ -136,7 +154,8 @@ export function PlatformSettingsProvider({ children }: { children: ReactNode }) 
   const value = {
     settings,
     loading,
-    refreshSettings
+    refreshSettings,
+    getAssetUrl
   };
 
   return (

@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   
   const { user, signIn } = useAuth();
-  const { settings } = usePlatformSettings();
+  const { settings, getAssetUrl } = usePlatformSettings();
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -32,6 +32,9 @@ export default function Login() {
     }
   };
 
+  const logoUrl = getAssetUrl(settings.site_logo_url);
+  const splashImageUrl = getAssetUrl(settings.login_splash_image_url);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex">
       {/* Left Side - Branding & Features */}
@@ -41,10 +44,10 @@ export default function Login() {
         <div className="absolute inset-0 bg-black bg-opacity-20" />
         
         {/* Background Image Overlay */}
-        {settings.login_splash_image_url && (
+        {splashImageUrl && (
           <div 
             className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
-            style={{ backgroundImage: `url(${settings.login_splash_image_url})` }}
+            style={{ backgroundImage: `url(${splashImageUrl})` }}
           />
         )}
         
@@ -53,9 +56,9 @@ export default function Login() {
           {/* Logo & Brand */}
           <div className="mb-12">
             <div className="flex items-center mb-6">
-              {settings.site_logo_url ? (
+              {logoUrl ? (
                 <img 
-                  src={settings.site_logo_url} 
+                  src={logoUrl} 
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-4"
                 />
@@ -140,9 +143,9 @@ export default function Login() {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              {settings.site_logo_url ? (
+              {logoUrl ? (
                 <img 
-                  src={settings.site_logo_url} 
+                  src={logoUrl} 
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-3"
                 />
