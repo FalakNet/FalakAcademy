@@ -77,6 +77,7 @@ export interface Course {
   updated_at: string;
   certificate_template_url?: string;
   certificate_settings?: CertificateSettings;
+  background_image_url?: string;
 }
 
 export interface CertificateSettings {

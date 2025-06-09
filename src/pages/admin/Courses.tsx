@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase, Course, Profile } from '../../lib/supabase';
-import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle } from 'lucide-react';
+import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle, Upload, Image } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CertificateTemplateManager from '../../components/CertificateTemplateManager';
 
@@ -14,6 +14,8 @@ export default function AdminCourses() {
   const [showCertificateModal, setShowCertificateModal] = useState<Course | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState<Course | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [uploadingBackground, setUploadingBackground] = useState<string | null>(null);
+  const backgroundInputRef = useRef<HTMLInputElement>(null);
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
@@ -98,6 +100,111 @@ export default function AdminCourses() {
       console.error('Error updating course:', error);
       alert('Failed to update course');
     }
+  };
+
+  const handleBackgroundUpload = async (courseId: string, file: File) => {
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+
+    setUploadingBackground(courseId);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${courseId}_${Date.now()}.${fileExt}`;
+
+      // Upload to course-backgrounds bucket
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('course-backgrounds')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Update course with background image URL
+      const { error: updateError } = await supabase
+        .from('courses')
+        .update({
+          background_image_url: uploadData.path
+        })
+        .eq('id', courseId);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setCourses(courses.map(course => 
+        course.id === courseId 
+          ? { ...course, background_image_url: uploadData.path }
+          : course
+      ));
+
+      alert('Background image uploaded successfully!');
+    } catch (error) {
+      console.error('Error uploading background image:', error);
+      alert('Failed to upload background image');
+    } finally {
+      setUploadingBackground(null);
+    }
+  };
+
+  const removeBackgroundImage = async (courseId: string, imagePath: string) => {
+    if (!confirm('Are you sure you want to remove the background image?')) {
+      return;
+    }
+
+    try {
+      // Delete from storage
+      const { error: deleteError } = await supabase.storage
+        .from('course-backgrounds')
+        .remove([imagePath]);
+
+      if (deleteError) {
+        console.warn('Could not delete file from storage:', deleteError);
+      }
+
+      // Update course to remove background image URL
+      const { error: updateError } = await supabase
+        .from('courses')
+        .update({
+          background_image_url: null
+        })
+        .eq('id', courseId);
+
+      if (updateError) throw updateError;
+
+      // Update local state
+      setCourses(courses.map(course => 
+        course.id === courseId 
+          ? { ...course, background_image_url: undefined }
+          : course
+      ));
+
+      alert('Background image removed successfully!');
+    } catch (error) {
+      console.error('Error removing background image:', error);
+      alert('Failed to remove background image');
+    }
+  };
+
+  const getBackgroundImageUrl = (course: Course) => {
+    if (!course.background_image_url) return null;
+    
+    const { data } = supabase.storage
+      .from('course-backgrounds')
+      .getPublicUrl(course.background_image_url);
+    
+    return data.publicUrl;
   };
 
   const deleteCourse = async (course: Course) => {
@@ -211,6 +318,13 @@ export default function AdminCourses() {
         .delete()
         .eq('course_id', course.id);
 
+      // Delete background image from storage if exists
+      if (course.background_image_url) {
+        await supabase.storage
+          .from('course-backgrounds')
+          .remove([course.background_image_url]);
+      }
+
       // Finally, delete the course itself
       const { error: courseError } = await supabase
         .from('courses')
@@ -303,98 +417,163 @@ export default function AdminCourses() {
 
       {/* Courses Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-        {courses.map((course) => (
-          <div key={course.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <div className="p-4 sm:p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                  <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    course.is_public 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-orange-100 text-orange-800'
-                  }`}>
-                    {course.is_public ? 'Public' : 'Private'}
-                  </span>
-                  {course.certificate_template_url && (
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
-                      Custom Cert
-                    </span>
-                  )}
-                  <button
-                    onClick={() => toggleCourseVisibility(course)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    {course.is_public ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              
-              <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
-                {course.title}
-              </h3>
-              
-              <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                {course.description || 'No description available'}
-              </p>
-              
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-xs sm:text-sm text-gray-500">
-                  Created {new Date(course.created_at).toLocaleDateString()}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <Link
-                  to={`/admin/courses/${course.id}/content`}
-                  className="flex items-center justify-center px-2 sm:px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                  <span className="hidden sm:inline">Content</span>
-                  <span className="sm:hidden">Edit</span>
-                </Link>
-                <Link
-                  to={`/admin/courses/${course.id}/enrollments`}
-                  className="flex items-center justify-center px-2 sm:px-3 py-2 text-xs sm:text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                  <span className="hidden sm:inline">Students</span>
-                  <span className="sm:hidden">Users</span>
-                </Link>
-              </div>
-
-              <div className="flex justify-between items-center pt-3 border-t border-gray-200">
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => setEditingCourse(course)}
-                    className="text-blue-600 hover:text-blue-800"
-                    title="Edit course"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setShowCertificateModal(course)}
-                    className="text-purple-600 hover:text-purple-800"
-                    title="Certificate settings"
-                  >
-                    <Award className="w-4 h-4" />
-                  </button>
-                </div>
-                {canDeleteCourse(course) && (
-                  <button
-                    onClick={() => setShowDeleteModal(course)}
-                    className="text-red-600 hover:text-red-800"
-                    title="Delete course"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+        {courses.map((course) => {
+          const backgroundImageUrl = getBackgroundImageUrl(course);
+          
+          return (
+            <div key={course.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full">
+              {/* Background Image Section */}
+              <div className="relative h-32 bg-gradient-to-r from-blue-500 to-purple-600 flex-shrink-0">
+                {backgroundImageUrl ? (
+                  <img
+                    src={backgroundImageUrl}
+                    alt={`${course.title} background`}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                    <BookOpen className="w-12 h-12 text-white opacity-50" />
+                  </div>
                 )}
+                
+                {/* Background Image Controls */}
+                <div className="absolute top-2 right-2 flex space-x-1">
+                  <input
+                    ref={backgroundInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleBackgroundUpload(course.id, file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  
+                  <button
+                    onClick={() => backgroundInputRef.current?.click()}
+                    disabled={uploadingBackground === course.id}
+                    className="p-1.5 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors disabled:opacity-50"
+                    title="Upload background image"
+                  >
+                    {uploadingBackground === course.id ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                  </button>
+                  
+                  {backgroundImageUrl && (
+                    <button
+                      onClick={() => removeBackgroundImage(course.id, course.background_image_url!)}
+                      className="p-1.5 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors"
+                      title="Remove background image"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-4 sm:p-6 flex flex-col flex-1">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      course.is_public 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-orange-100 text-orange-800'
+                    }`}>
+                      {course.is_public ? 'Public' : 'Private'}
+                    </span>
+                    {course.certificate_template_url && (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                        Custom Cert
+                      </span>
+                    )}
+                    {backgroundImageUrl && (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
+                        <Image className="w-3 h-3 inline mr-1" />
+                        BG
+                      </span>
+                    )}
+                    <button
+                      onClick={() => toggleCourseVisibility(course)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      {course.is_public ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                
+                <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                  {course.title}
+                </h3>
+                
+                {/* Fixed 3-line description space */}
+                <div className="h-16 mb-4">
+                  <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed">
+                    {course.description || 'No description available'}
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-xs sm:text-sm text-gray-500">
+                    Created {new Date(course.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+
+                {/* Spacer to push buttons to bottom */}
+                <div className="flex-1"></div>
+
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <Link
+                    to={`/admin/courses/${course.id}/content`}
+                    className="flex items-center justify-center px-2 sm:px-3 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Settings className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                    <span className="hidden sm:inline">Content</span>
+                    <span className="sm:hidden">Edit</span>
+                  </Link>
+                  <Link
+                    to={`/admin/courses/${course.id}/enrollments`}
+                    className="flex items-center justify-center px-2 sm:px-3 py-2 text-xs sm:text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <UserPlus className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                    <span className="hidden sm:inline">Students</span>
+                    <span className="sm:hidden">Users</span>
+                  </Link>
+                </div>
+
+                <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setEditingCourse(course)}
+                      className="text-blue-600 hover:text-blue-800"
+                      title="Edit course"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setShowCertificateModal(course)}
+                      className="text-purple-600 hover:text-purple-800"
+                      title="Certificate settings"
+                    >
+                      <Award className="w-4 h-4" />
+                    </button>
+                  </div>
+                  {canDeleteCourse(course) && (
+                    <button
+                      onClick={() => setShowDeleteModal(course)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Delete course"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {courses.length === 0 && (
@@ -563,6 +742,7 @@ export default function AdminCourses() {
                     <li>• All quizzes and quiz attempts</li>
                     <li>• All course materials</li>
                     <li>• All certificates issued for this course</li>
+                    <li>• Background image and other assets</li>
                     <li>• All related data and analytics</li>
                   </ul>
                 </div>

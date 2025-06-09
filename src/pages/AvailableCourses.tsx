@@ -69,6 +69,16 @@ export default function AvailableCourses() {
     }
   };
 
+  const getBackgroundImageUrl = (course: Course) => {
+    if (!course.background_image_url) return null;
+    
+    const { data } = supabase.storage
+      .from('course-backgrounds')
+      .getPublicUrl(course.background_image_url);
+    
+    return data.publicUrl;
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
@@ -93,37 +103,47 @@ export default function AvailableCourses() {
           {courses.map((course) => {
             const isEnrolled = enrolledCourseIds.has(course.id);
             const isEnrolling = enrollingCourseId === course.id;
+            const backgroundImageUrl = getBackgroundImageUrl(course);
 
             return (
-              <div key={course.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <BookOpen className="w-6 h-6 text-blue-600" />
+              <div key={course.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full">
+                {/* Background Image Header */}
+                <div className="relative h-32 bg-gradient-to-r from-blue-500 to-purple-600 flex-shrink-0">
+                  {backgroundImageUrl ? (
+                    <img
+                      src={backgroundImageUrl}
+                      alt={`${course.title} background`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+                      <BookOpen className="w-12 h-12 text-white opacity-50" />
                     </div>
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                  )}
+                  
+                  {/* Course Status Overlay */}
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100/90 text-green-800 backdrop-blur-sm">
                       Public
                     </span>
                   </div>
-                  
+                </div>
+
+                <div className="p-6 flex flex-col flex-1">
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     {course.title}
                   </h3>
                   
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {course.description || 'No description available'}
-                  </p>
-                  
-                  <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 mr-1" />
-                      <span>Self-paced</span>
-                    </div>
-                    <div className="flex items-center">
-                      <Users className="w-4 h-4 mr-1" />
-                      <span>Online</span>
-                    </div>
+                  {/* Fixed 3-line description space */}
+                  <div className="h-16 mb-4">
+                    <p className="text-gray-600 text-sm line-clamp-3 leading-relaxed">
+                      {course.description || 'No description available'}
+                    </p>
                   </div>
+                
+
+                  {/* Spacer to push button to bottom */}
+                  <div className="flex-1"></div>
                   
                   {isEnrolled ? (
                     <button
