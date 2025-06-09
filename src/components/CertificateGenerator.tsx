@@ -356,10 +356,9 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+    <div className="">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center">
-          <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400 mr-3" />
         </div>
       </div>
 
@@ -372,7 +371,6 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
         </div>
       )}
       
-      <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
         <button
           onClick={generatePDFCertificate}
           disabled={generating}
@@ -390,7 +388,6 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
             </>
           )}
         </button>
-      </div>
     </div>
   );
 }
