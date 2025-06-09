@@ -164,12 +164,6 @@ export default function AdminSettings() {
             value={stats.totalQuizzes}
             color="bg-purple-500"
           />
-          <StatCard
-            icon={Database}
-            title="Materials"
-            value={stats.totalMaterials}
-            color="bg-pink-500"
-          />
         </div>
       </div>
 
