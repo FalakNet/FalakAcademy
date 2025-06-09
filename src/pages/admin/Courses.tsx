@@ -491,12 +491,6 @@ export default function AdminCourses() {
                         Custom Cert
                       </span>
                     )}
-                    {backgroundImageUrl && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
-                        <Image className="w-3 h-3 inline mr-1" />
-                        BG
-                      </span>
-                    )}
                   </div>
                   <button
                     onClick={() => toggleCourseVisibility(course)}
