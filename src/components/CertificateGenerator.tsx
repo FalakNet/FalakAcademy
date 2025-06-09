@@ -356,6 +356,12 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
   };
 
   return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400 mr-3" />
+        </div>
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -385,5 +391,6 @@ export default function CertificateGenerator({ certificate, profile, onDownload 
           )}
         </button>
       </div>
+    </div>
   );
 }
