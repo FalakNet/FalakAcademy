@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { usePlatformSettings } from '../hooks/usePlatformSettings';
 import { BookOpen, Eye, EyeOff } from 'lucide-react';
 
 export default function Login() {
@@ -11,6 +12,7 @@ export default function Login() {
   const [error, setError] = useState('');
   
   const { user, signIn } = useAuth();
+  const { settings } = usePlatformSettings();
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -31,23 +33,41 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div 
+      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative"
+      style={{
+        backgroundImage: settings.login_splash_image_url 
+          ? `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${settings.login_splash_image_url})`
+          : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="flex justify-center">
-            <div className="flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full">
-              <BookOpen className="w-8 h-8 text-white" />
+            <div className="flex items-center justify-center w-16 h-16 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
+              {settings.site_logo_url ? (
+                <img 
+                  src={settings.site_logo_url} 
+                  alt={settings.site_name}
+                  className="w-8 h-8 object-contain"
+                />
+              ) : (
+                <BookOpen className="w-8 h-8 text-white" />
+              )}
             </div>
           </div>
-          <h2 className="mt-6 text-2xl sm:text-3xl font-bold text-gray-900">
+          <h2 className="mt-6 text-2xl sm:text-3xl font-bold text-white">
             Sign in to your account
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Welcome to Falak Academy
+          <p className="mt-2 text-sm text-white/80">
+            Welcome to {settings.site_name}
           </p>
         </div>
 
-        <div className="bg-white py-8 px-6 shadow rounded-lg">
+        <div className="bg-white/95 backdrop-blur-sm py-8 px-6 shadow-xl rounded-lg border border-white/20">
           <form className="space-y-6" onSubmit={handleSubmit}>
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded text-sm">
@@ -107,20 +127,58 @@ export default function Login() {
                 type="submit"
                 disabled={loading}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: settings.primary_color }}
               >
                 {loading ? 'Signing in...' : 'Sign in'}
               </button>
             </div>
 
-            <div className="text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">
-                  Sign up
-                </Link>
-              </p>
-            </div>
+            {settings.allow_public_registration && (
+              <div className="text-center">
+                <p className="text-sm text-gray-600">
+                  Don't have an account?{' '}
+                  <Link 
+                    to="/signup" 
+                    className="font-medium hover:underline"
+                    style={{ color: settings.primary_color }}
+                  >
+                    Sign up
+                  </Link>
+                </p>
+              </div>
+            )}
           </form>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center">
+          <p className="text-xs text-white/60">
+            {settings.footer_text}
+          </p>
+          {(settings.terms_url || settings.privacy_url) && (
+            <div className="mt-2 space-x-4">
+              {settings.terms_url && (
+                <a 
+                  href={settings.terms_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-white/80 hover:text-white underline"
+                >
+                  Terms of Service
+                </a>
+              )}
+              {settings.privacy_url && (
+                <a 
+                  href={settings.privacy_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-xs text-white/80 hover:text-white underline"
+                >
+                  Privacy Policy
+                </a>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

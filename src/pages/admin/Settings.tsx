@@ -1,12 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabase';
-import { Settings, Database, Users, Shield, Mail, Globe, Save, AlertCircle } from 'lucide-react';
+import { 
+  Settings, Database, Users, Shield, Mail, Globe, Save, AlertCircle, 
+  Upload, Image, Palette, Eye, EyeOff, CheckCircle, X, Monitor,
+  FileText, Lock, HelpCircle, Trash2
+} from 'lucide-react';
+
+interface AdminSetting {
+  id: string;
+  setting_key: string;
+  setting_value: any;
+  setting_type: string;
+  category: string;
+  display_name: string;
+  description?: string;
+}
 
 export default function AdminSettings() {
   const { profile, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [settings, setSettings] = useState<Record<string, AdminSetting>>({});
+  const [uploadingAssets, setUploadingAssets] = useState<Set<string>>(new Set());
+  const [activeTab, setActiveTab] = useState<'branding' | 'general' | 'features' | 'legal' | 'system'>('branding');
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalCourses: 0,
@@ -15,28 +34,39 @@ export default function AdminSettings() {
     totalMaterials: 0
   });
 
-  const [systemSettings, setSystemSettings] = useState({
-    siteName: 'Falak Academy',
-    siteDescription: 'Professional Learning Management System',
-    allowPublicRegistration: true,
-    requireEmailVerification: false,
-    defaultUserRole: 'USER',
-    maxFileUploadSize: 50, // MB
-    enableCertificates: true,
-    enableQuizzes: true,
-    maintenanceMode: false
-  });
-
   useEffect(() => {
     if (isSuperAdmin()) {
+      loadSettings();
       loadSystemStats();
     }
   }, [profile]);
 
-  const loadSystemStats = async () => {
+  const loadSettings = async () => {
     try {
       setLoading(true);
       
+      const { data, error } = await supabase
+        .from('admin_settings')
+        .select('*')
+        .order('category, display_name');
+
+      if (error) throw error;
+
+      const settingsMap: Record<string, AdminSetting> = {};
+      data?.forEach(setting => {
+        settingsMap[setting.setting_key] = setting;
+      });
+
+      setSettings(settingsMap);
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSystemStats = async () => {
+    try {
       const [users, courses, enrollments, quizzes, materials] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('courses').select('id', { count: 'exact', head: true }),
@@ -54,19 +84,123 @@ export default function AdminSettings() {
       });
     } catch (error) {
       console.error('Error loading system stats:', error);
-    } finally {
-      setLoading(false);
     }
   };
 
-  const saveSettings = async () => {
+  const updateSetting = async (key: string, value: any) => {
+    try {
+      const setting = settings[key];
+      if (!setting) return;
+
+      const { error } = await supabase
+        .from('admin_settings')
+        .update({ 
+          setting_value: JSON.stringify(value),
+          updated_at: new Date().toISOString()
+        })
+        .eq('setting_key', key);
+
+      if (error) throw error;
+
+      setSettings(prev => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          setting_value: value
+        }
+      }));
+    } catch (error) {
+      console.error('Error updating setting:', error);
+      throw error;
+    }
+  };
+
+  const handleFileUpload = async (settingKey: string, file: File) => {
+    if (!file) return;
+
+    // Validate file type for images
+    if (settings[settingKey]?.setting_type === 'image' && !file.type.startsWith('image/')) {
+      alert('Please upload an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    setUploadingAssets(prev => new Set([...prev, settingKey]));
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${settingKey}_${Date.now()}.${fileExt}`;
+
+      // Upload to platform-assets bucket
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('platform-assets')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('platform-assets')
+        .getPublicUrl(uploadData.path);
+
+      // Update setting with new URL
+      await updateSetting(settingKey, urlData.publicUrl);
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Failed to upload file');
+    } finally {
+      setUploadingAssets(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(settingKey);
+        return newSet;
+      });
+    }
+  };
+
+  const removeAsset = async (settingKey: string) => {
+    if (!confirm('Are you sure you want to remove this asset?')) return;
+
+    try {
+      const currentUrl = settings[settingKey]?.setting_value;
+      if (currentUrl && typeof currentUrl === 'string') {
+        // Extract file path from URL
+        const urlParts = currentUrl.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        
+        // Delete from storage
+        await supabase.storage
+          .from('platform-assets')
+          .remove([fileName]);
+      }
+
+      // Update setting to null
+      await updateSetting(settingKey, null);
+    } catch (error) {
+      console.error('Error removing asset:', error);
+      alert('Failed to remove asset');
+    }
+  };
+
+  const saveAllSettings = async () => {
     setSaveStatus('saving');
     
-    // Simulate saving settings (in a real app, you'd save to a settings table)
-    setTimeout(() => {
+    try {
+      // All settings are saved individually, so this is just a status update
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
-    }, 1000);
+    } catch (error) {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    }
   };
 
   const exportData = async (table: string) => {
@@ -87,6 +221,160 @@ export default function AdminSettings() {
       console.error(`Error exporting ${table}:`, error);
       alert(`Failed to export ${table} data`);
     }
+  };
+
+  const renderSettingInput = (setting: AdminSetting) => {
+    const value = setting.setting_value;
+    const isUploading = uploadingAssets.has(setting.setting_key);
+
+    switch (setting.setting_type) {
+      case 'text':
+      case 'email':
+      case 'url':
+        return (
+          <input
+            type={setting.setting_type === 'email' ? 'email' : setting.setting_type === 'url' ? 'url' : 'text'}
+            value={value || ''}
+            onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            placeholder={setting.description}
+          />
+        );
+
+      case 'number':
+        return (
+          <input
+            type="number"
+            value={value || 0}
+            onChange={(e) => updateSetting(setting.setting_key, parseInt(e.target.value) || 0)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            min="0"
+          />
+        );
+
+      case 'boolean':
+        return (
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={value || false}
+              onChange={(e) => updateSetting(setting.setting_key, e.target.checked)}
+              className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <span className="text-sm text-gray-700">
+              {value ? 'Enabled' : 'Disabled'}
+            </span>
+          </label>
+        );
+
+      case 'color':
+        return (
+          <div className="flex items-center space-x-3">
+            <input
+              type="color"
+              value={value || '#2563eb'}
+              onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+              className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
+            />
+            <input
+              type="text"
+              value={value || '#2563eb'}
+              onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+              placeholder="#2563eb"
+            />
+          </div>
+        );
+
+      case 'select':
+        if (setting.setting_key === 'default_user_role') {
+          return (
+            <select
+              value={value || 'USER'}
+              onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="USER">User</option>
+              <option value="COURSE_ADMIN">Course Admin</option>
+            </select>
+          );
+        }
+        return null;
+
+      case 'image':
+        return (
+          <div className="space-y-3">
+            {value && (
+              <div className="relative inline-block">
+                <img
+                  src={value}
+                  alt={setting.display_name}
+                  className="max-w-xs max-h-32 rounded-lg border border-gray-200"
+                />
+                <button
+                  onClick={() => removeAsset(setting.setting_key)}
+                  className="absolute -top-2 -right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+            
+            <div className="flex items-center space-x-3">
+              <input
+                ref={(el) => fileInputRefs.current[setting.setting_key] = el}
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(setting.setting_key, file);
+                }}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRefs.current[setting.setting_key]?.click()}
+                disabled={isUploading}
+                className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {isUploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    {value ? 'Replace' : 'Upload'}
+                  </>
+                )}
+              </button>
+              {value && (
+                <button
+                  onClick={() => removeAsset(setting.setting_key)}
+                  className="inline-flex items-center px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        );
+
+      default:
+        return (
+          <input
+            type="text"
+            value={value || ''}
+            onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+          />
+        );
+    }
+  };
+
+  const getSettingsByCategory = (category: string) => {
+    return Object.values(settings).filter(setting => setting.category === category);
   };
 
   if (!isSuperAdmin()) {
@@ -118,21 +406,29 @@ export default function AdminSettings() {
     </div>
   );
 
+  const tabs = [
+    { id: 'branding', name: 'Branding', icon: Palette },
+    { id: 'general', name: 'General', icon: Settings },
+    { id: 'features', name: 'Features', icon: Monitor },
+    { id: 'legal', name: 'Legal', icon: FileText },
+    { id: 'system', name: 'System', icon: Database }
+  ];
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">System Settings</h1>
-          <p className="mt-2 text-gray-600">Manage system configuration and monitor platform statistics.</p>
+          <h1 className="text-3xl font-bold text-gray-900">Platform Settings</h1>
+          <p className="mt-2 text-gray-600">Configure your learning platform's appearance and functionality.</p>
         </div>
         <button
-          onClick={saveSettings}
+          onClick={saveAllSettings}
           disabled={saveStatus === 'saving'}
-          className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           <Save className="w-4 h-4 mr-2" />
-          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save Settings'}
+          {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'saved' ? 'Saved!' : 'Save All'}
         </button>
       </div>
 
@@ -167,194 +463,118 @@ export default function AdminSettings() {
         </div>
       </div>
 
-      {/* Settings Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* General Settings */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Globe className="w-5 h-5 mr-2" />
-            General Settings
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Site Name</label>
-              <input
-                type="text"
-                value={systemSettings.siteName}
-                onChange={(e) => setSystemSettings({ ...systemSettings, siteName: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Site Description</label>
-              <textarea
-                value={systemSettings.siteDescription}
-                onChange={(e) => setSystemSettings({ ...systemSettings, siteDescription: e.target.value })}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max File Upload Size (MB)</label>
-              <input
-                type="number"
-                min="1"
-                max="100"
-                value={systemSettings.maxFileUploadSize}
-                onChange={(e) => setSystemSettings({ ...systemSettings, maxFileUploadSize: parseInt(e.target.value) || 50 })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* User Management Settings */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Users className="w-5 h-5 mr-2" />
-            User Management
-          </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Allow Public Registration</label>
-                <p className="text-xs text-gray-500">Allow users to sign up without invitation</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={systemSettings.allowPublicRegistration}
-                onChange={(e) => setSystemSettings({ ...systemSettings, allowPublicRegistration: e.target.checked })}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Require Email Verification</label>
-                <p className="text-xs text-gray-500">Users must verify email before accessing</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={systemSettings.requireEmailVerification}
-                onChange={(e) => setSystemSettings({ ...systemSettings, requireEmailVerification: e.target.checked })}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Default User Role</label>
-              <select
-                value={systemSettings.defaultUserRole}
-                onChange={(e) => setSystemSettings({ ...systemSettings, defaultUserRole: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-purple-500 focus:border-purple-500"
+      {/* Settings Tabs */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8 px-6">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === tab.id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
               >
-                <option value="USER">User</option>
-                <option value="COURSE_ADMIN">Course Admin</option>
-              </select>
-            </div>
-          </div>
+                <tab.icon className="w-4 h-4 mr-2" />
+                {tab.name}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        {/* Feature Settings */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Settings className="w-5 h-5 mr-2" />
-            Feature Settings
-          </h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Enable Certificates</label>
-                <p className="text-xs text-gray-500">Allow automatic certificate generation</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={systemSettings.enableCertificates}
-                onChange={(e) => setSystemSettings({ ...systemSettings, enableCertificates: e.target.checked })}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
+        {/* Tab Content */}
+        <div className="p-6">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Enable Quizzes</label>
-                <p className="text-xs text-gray-500">Allow quiz creation and taking</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={systemSettings.enableQuizzes}
-                onChange={(e) => setSystemSettings({ ...systemSettings, enableQuizzes: e.target.checked })}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Maintenance Mode</label>
-                <p className="text-xs text-gray-500">Temporarily disable public access</p>
-              </div>
-              <input
-                type="checkbox"
-                checked={systemSettings.maintenanceMode}
-                onChange={(e) => setSystemSettings({ ...systemSettings, maintenanceMode: e.target.checked })}
-                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Data Management */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <Database className="w-5 h-5 mr-2" />
-            Data Management
-          </h3>
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Export Data</h4>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => exportData('profiles')}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                >
-                  Users
-                </button>
-                <button
-                  onClick={() => exportData('courses')}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                >
-                  Courses
-                </button>
-                <button
-                  onClick={() => exportData('enrollments')}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                >
-                  Enrollments
-                </button>
-                <button
-                  onClick={() => exportData('certificates')}
-                  className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                >
-                  Certificates
-                </button>
-              </div>
-            </div>
-            <div className="pt-4 border-t border-gray-200">
-              <div className="flex items-start space-x-2">
-                <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Database Backup</p>
-                  <p className="text-xs text-gray-500">
-                    Regular backups are automatically handled by Supabase. 
-                    Contact support for manual backup requests.
-                  </p>
+          ) : (
+            <div className="space-y-6">
+              {getSettingsByCategory(activeTab).map((setting) => (
+                <div key={setting.setting_key} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        {setting.display_name}
+                      </label>
+                      {setting.description && (
+                        <p className="text-xs text-gray-500 mt-1">{setting.description}</p>
+                      )}
+                    </div>
+                  </div>
+                  {renderSettingInput(setting)}
                 </div>
-              </div>
+              ))}
+
+              {/* System Tab Additional Content */}
+              {activeTab === 'system' && (
+                <div className="border-t border-gray-200 pt-6 mt-8">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Data Management</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Export Data</h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => exportData('profiles')}
+                          className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                        >
+                          Users
+                        </button>
+                        <button
+                          onClick={() => exportData('courses')}
+                          className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                        >
+                          Courses
+                        </button>
+                        <button
+                          onClick={() => exportData('enrollments')}
+                          className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                        >
+                          Enrollments
+                        </button>
+                        <button
+                          onClick={() => exportData('certificates')}
+                          className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                        >
+                          Certificates
+                        </button>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-gray-200">
+                      <div className="flex items-start space-x-2">
+                        <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-700">Database Backup</p>
+                          <p className="text-xs text-gray-500">
+                            Regular backups are automatically handled by Supabase. 
+                            Contact support for manual backup requests.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Save Status */}
       {saveStatus === 'saved' && (
-        <div className="fixed bottom-4 right-4 bg-green-100 border border-green-200 text-green-800 px-4 py-2 rounded-lg shadow-lg">
+        <div className="fixed bottom-4 right-4 bg-green-100 border border-green-200 text-green-800 px-4 py-2 rounded-lg shadow-lg flex items-center">
+          <CheckCircle className="w-4 h-4 mr-2" />
           Settings saved successfully!
+        </div>
+      )}
+
+      {saveStatus === 'error' && (
+        <div className="fixed bottom-4 right-4 bg-red-100 border border-red-200 text-red-800 px-4 py-2 rounded-lg shadow-lg flex items-center">
+          <AlertCircle className="w-4 h-4 mr-2" />
+          Failed to save settings!
         </div>
       )}
     </div>

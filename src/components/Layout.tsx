@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { usePlatformSettings } from '../hooks/usePlatformSettings';
 import { 
   BookOpen, 
   Users, 
@@ -23,6 +24,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { profile, signOut, isAdmin, isSuperAdmin } = useAuth();
+  const { settings } = usePlatformSettings();
   const location = useLocation();
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -110,8 +112,16 @@ export default function Layout({ children }: LayoutProps) {
           {/* Header - Hide logo on mobile */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="hidden lg:flex items-center">
-              <BookOpen className="w-8 h-8 text-blue-600 mr-3" />
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Falak Academy</h1>
+              {settings.site_logo_url ? (
+                <img 
+                  src={settings.site_logo_url} 
+                  alt={settings.site_name}
+                  className="w-8 h-8 mr-3 object-contain"
+                />
+              ) : (
+                <BookOpen className="w-8 h-8 text-blue-600 mr-3" />
+              )}
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">{settings.site_name}</h1>
             </div>
             <button
               onClick={closeSidebar}
@@ -208,8 +218,16 @@ export default function Layout({ children }: LayoutProps) {
               <Menu className="w-6 h-6" />
             </button>
             <div className="flex items-center">
-              <BookOpen className="w-6 h-6 text-blue-600 mr-2" />
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">Falak Academy</h1>
+              {settings.site_logo_url ? (
+                <img 
+                  src={settings.site_logo_url} 
+                  alt={settings.site_name}
+                  className="w-6 h-6 mr-2 object-contain"
+                />
+              ) : (
+                <BookOpen className="w-6 h-6 text-blue-600 mr-2" />
+              )}
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">{settings.site_name}</h1>
             </div>
             <div className="w-6 h-6" /> {/* Spacer for centering */}
           </div>
