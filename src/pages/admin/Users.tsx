@@ -35,31 +35,22 @@ export default function AdminUsers() {
 
   const loadUsers = async () => {
     try {
-      console.log('🔄 Loading users from database...');
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      console.log('✅ Users loaded successfully:', data?.length || 0, 'users');
       setUsers(data || []);
     } catch (error) {
-      console.error('❌ Error loading users:', error);
+      console.error('Error loading users:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const updateUserRole = async (userId: string, newRole: UserRole) => {
-    console.log('🚀 Starting role update process...');
-    console.log('📋 User ID:', userId);
-    console.log('🔄 New Role:', newRole);
-    console.log('👤 Current User:', profile?.id);
-    console.log('🔑 Is SuperAdmin:', isSuperAdmin());
-
     if (!isSuperAdmin()) {
-      console.error('❌ Permission denied: User is not superadmin');
       alert('You do not have permission to update user roles.');
       return;
     }
@@ -67,18 +58,12 @@ export default function AdminUsers() {
     // Find the user being updated
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) {
-      console.error('❌ Target user not found');
       alert('User not found');
       return;
     }
 
-    console.log('📝 Target user:', targetUser.name, '(', targetUser.email, ')');
-    console.log('🔄 Current role:', targetUser.role, '→ New role:', newRole);
-
     setUpdating(true);
     try {
-      console.log('💾 Updating database with service role...');
-      
       // Use the service role key for admin operations
       const { data, error } = await supabase.rpc('update_user_role', {
         target_user_id: userId,
@@ -86,8 +71,6 @@ export default function AdminUsers() {
       });
 
       if (error) {
-        console.error('❌ RPC call failed, trying direct update:', error);
-        
         // Fallback to direct update
         const { data: directData, error: directError } = await supabase
           .from('profiles')
@@ -99,20 +82,14 @@ export default function AdminUsers() {
           .select();
 
         if (directError) {
-          console.error('❌ Direct update also failed:', directError);
           throw directError;
         }
-        
-        console.log('✅ Direct update successful:', directData);
-      } else {
-        console.log('✅ RPC update successful:', data);
       }
 
       // Wait a moment for the database to process
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verify the update by fetching the user again
-      console.log('🔍 Verifying update...');
       const { data: verifyData, error: verifyError } = await supabase
         .from('profiles')
         .select('*')
@@ -120,19 +97,14 @@ export default function AdminUsers() {
         .single();
 
       if (verifyError) {
-        console.error('❌ Verification failed:', verifyError);
         throw verifyError;
       } else {
-        console.log('✅ Verification successful. User role in DB:', verifyData.role);
-        
         if (verifyData.role !== newRole) {
-          console.error('❌ Role was not updated in database. Expected:', newRole, 'Got:', verifyData.role);
           throw new Error(`Role update failed. Database still shows: ${verifyData.role}`);
         }
       }
 
       // Update local state with verified data
-      console.log('🔄 Updating local state...');
       const updatedUsers = users.map(user => 
         user.id === userId ? verifyData : user
       );
@@ -140,13 +112,9 @@ export default function AdminUsers() {
       
       setEditingUser(null);
       
-      console.log('🎉 Role update completed successfully!');
-      alert(`✅ User role updated to ${newRole.toLowerCase().replace('_', ' ')} successfully!`);
-      
     } catch (error) {
-      console.error('💥 Role update failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`❌ Failed to update user role: ${errorMessage}`);
+      alert(`Failed to update user role: ${errorMessage}`);
       
       // Reset the editing state on error
       setEditingUser(null);
@@ -156,9 +124,7 @@ export default function AdminUsers() {
   };
 
   const handleRoleChange = (newRole: UserRole) => {
-    console.log('🔄 Role selection changed to:', newRole);
     if (!editingUser) {
-      console.warn('⚠️ No user being edited');
       return;
     }
     
@@ -166,30 +132,21 @@ export default function AdminUsers() {
       ...editingUser,
       role: newRole
     });
-    console.log('✅ Editing user role updated locally');
   };
 
   const saveRoleChange = async () => {
-    console.log('💾 Save button clicked');
     if (!editingUser) {
-      console.warn('⚠️ No user being edited');
       return;
     }
-    
-    console.log('📋 Saving role change for:', editingUser.name);
-    console.log('🔄 Role change:', editingUser.role);
     
     await updateUserRole(editingUser.id, editingUser.role);
   };
 
   const cancelEdit = () => {
-    console.log('❌ Edit cancelled');
     setEditingUser(null);
   };
 
   const startEdit = (user: Profile) => {
-    console.log('✏️ Starting edit for user:', user.name);
-    console.log('📋 Current role:', user.role);
     setEditingUser(user);
   };
 
@@ -197,11 +154,6 @@ export default function AdminUsers() {
     if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
       return;
     }
-
-    console.log('🚀 STARTING USER DELETION PROCESS');
-    console.log('📋 Target User ID:', userId);
-    console.log('👤 Current User ID:', profile?.id);
-    console.log('🔑 Current User Role:', profile?.role);
 
     try {
       // Refresh profile before attempting deletion to ensure we have the latest role
@@ -214,7 +166,6 @@ export default function AdminUsers() {
       }
 
       // Step 1: Verify user exists in database before deletion
-      console.log('🔍 STEP 1: Checking if user exists in database...');
       const { data: userCheck, error: userCheckError } = await supabase
         .from('profiles')
         .select('id, name, email, role')
@@ -222,14 +173,10 @@ export default function AdminUsers() {
         .single();
 
       if (userCheckError) {
-        console.error('❌ User check failed:', userCheckError);
         throw new Error(`User not found: ${userCheckError.message}`);
       }
 
-      console.log('✅ User found in database:', userCheck);
-
       // Step 2: Call the delete-user Edge Function
-      console.log('🗑️ STEP 2: Calling delete-user Edge Function...');
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`;
       
       // Use the authenticated user's session token instead of the anonymous key
@@ -250,40 +197,25 @@ export default function AdminUsers() {
 
       if (!response.ok) {
         const errorData = await response.text();
-        console.error('❌ Edge Function call failed:', response.status, errorData);
         throw new Error(`Failed to delete user: ${response.status} ${errorData}`);
       }
 
       const result = await response.json();
-      console.log('✅ Edge Function response:', result);
 
       // Step 3: Update local state
-      console.log('🔄 STEP 3: Updating local state...');
       const originalUsersCount = users.length;
       const newUsers = users.filter(user => user.id !== userId);
       setUsers(newUsers);
       
-      console.log('📊 Users count before:', originalUsersCount);
-      console.log('📊 Users count after:', newUsers.length);
-      console.log('✅ Local state updated successfully');
-
       // Step 4: Reload users from database to verify
-      console.log('🔄 STEP 4: Reloading users from database to verify...');
       await loadUsers();
       
-      console.log('🎉 USER DELETION COMPLETED SUCCESSFULLY');
       alert('User deleted successfully');
 
     } catch (error) {
-      console.error('💥 USER DELETION FAILED:', error);
-      console.error('📋 Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        userId,
-        timestamp: new Date().toISOString()
-      });
+      console.error('Error deleting user:', error);
       
       // Reload users to ensure UI is in sync with database
-      console.log('🔄 Reloading users to sync UI with database...');
       await loadUsers();
       
       alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -471,18 +403,6 @@ export default function AdminUsers() {
           <Plus className="w-4 h-4 mr-2" />
           Add User
         </button>
-      </div>
-
-      {/* Debug Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h3 className="font-medium text-blue-900 mb-2">Debug Information</h3>
-        <div className="text-sm text-blue-800 space-y-1">
-          <p>Current User: {profile?.name} ({profile?.role})</p>
-          <p>Is SuperAdmin: {isSuperAdmin() ? 'Yes' : 'No'}</p>
-          <p>Total Users: {users.length}</p>
-          <p>Editing User: {editingUser ? `${editingUser.name} (${editingUser.role})` : 'None'}</p>
-          <p>Updating: {updating ? 'Yes' : 'No'}</p>
-        </div>
       </div>
 
       {/* Filters and Search */}
