@@ -22,7 +22,7 @@ export default function Signup() {
 
   // If public registration is disabled, redirect to login
   if (!settings.allow_public_registration) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login\" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
