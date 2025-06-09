@@ -10,6 +10,7 @@ export default function AdminUsers() {
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'USER' as UserRole });
+  const [updating, setUpdating] = useState(false);
   
   // Sorting and filtering state
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'created_at'>('created_at');
@@ -49,22 +50,58 @@ export default function AdminUsers() {
   };
 
   const updateUserRole = async (userId: string, newRole: UserRole) => {
+    if (!isSuperAdmin()) {
+      alert('You do not have permission to update user roles.');
+      return;
+    }
+
+    setUpdating(true);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ role: newRole })
+        .update({ 
+          role: newRole,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', userId);
 
       if (error) throw error;
 
+      // Update local state
       setUsers(users.map(user => 
         user.id === userId ? { ...user, role: newRole } : user
       ));
+      
       setEditingUser(null);
+      
+      // Show success message
+      alert(`User role updated to ${newRole.toLowerCase().replace('_', ' ')} successfully!`);
+      
     } catch (error) {
       console.error('Error updating user role:', error);
-      alert('Failed to update user role');
+      alert('Failed to update user role: ' + (error as any).message);
+    } finally {
+      setUpdating(false);
     }
+  };
+
+  const handleRoleChange = (newRole: UserRole) => {
+    if (!editingUser) return;
+    
+    setEditingUser({
+      ...editingUser,
+      role: newRole
+    });
+  };
+
+  const saveRoleChange = async () => {
+    if (!editingUser) return;
+    
+    await updateUserRole(editingUser.id, editingUser.role);
+  };
+
+  const cancelEdit = () => {
+    setEditingUser(null);
   };
 
   const deleteUser = async (userId: string) => {
@@ -446,15 +483,18 @@ export default function AdminUsers() {
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     {editingUser?.id === user.id ? (
-                      <select
-                        value={editingUser.role}
-                        onChange={(e) => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
-                        className="text-sm border border-gray-300 rounded px-2 py-1"
-                      >
-                        <option value="USER">User</option>
-                        <option value="COURSE_ADMIN">Course Admin</option>
-                        <option value="SUPERADMIN">Superadmin</option>
-                      </select>
+                      <div className="flex items-center space-x-2">
+                        <select
+                          value={editingUser.role}
+                          onChange={(e) => handleRoleChange(e.target.value as UserRole)}
+                          className="text-sm border border-gray-300 rounded px-2 py-1 focus:ring-blue-500 focus:border-blue-500"
+                          disabled={updating}
+                        >
+                          <option value="USER">User</option>
+                          <option value="COURSE_ADMIN">Course Admin</option>
+                          <option value="SUPERADMIN">Superadmin</option>
+                        </select>
+                      </div>
                     ) : (
                       getRoleBadge(user.role)
                     )}
@@ -471,14 +511,16 @@ export default function AdminUsers() {
                     {editingUser?.id === user.id ? (
                       <div className="flex justify-end space-x-2">
                         <button
-                          onClick={() => updateUserRole(user.id, editingUser.role)}
-                          className="text-green-600 hover:text-green-900 px-2 py-1 text-sm"
+                          onClick={saveRoleChange}
+                          disabled={updating}
+                          className="text-green-600 hover:text-green-900 px-2 py-1 text-sm disabled:opacity-50"
                         >
-                          Save
+                          {updating ? 'Saving...' : 'Save'}
                         </button>
                         <button
-                          onClick={() => setEditingUser(null)}
-                          className="text-gray-600 hover:text-gray-900 px-2 py-1 text-sm"
+                          onClick={cancelEdit}
+                          disabled={updating}
+                          className="text-gray-600 hover:text-gray-900 px-2 py-1 text-sm disabled:opacity-50"
                         >
                           Cancel
                         </button>
@@ -526,6 +568,65 @@ export default function AdminUsers() {
               : 'No users have been created yet.'
             }
           </p>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-md">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Create New User</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={newUser.name}
+                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={newUser.email}
+                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="email@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                  <select
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as UserRole })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="USER">User</option>
+                    <option value="COURSE_ADMIN">Course Admin</option>
+                    <option value="SUPERADMIN">Superadmin</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 order-2 sm:order-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createUser}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 order-1 sm:order-2"
+                >
+                  Create User
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
