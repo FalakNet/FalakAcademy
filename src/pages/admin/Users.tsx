@@ -31,7 +31,7 @@ export default function AdminUsers() {
     };
 
     initializeComponent();
-  }, [profile]);
+  }, [profile?.id]); // Only depend on profile.id to prevent excessive reloads
 
   const loadUsers = async () => {
     try {
@@ -77,27 +77,39 @@ export default function AdminUsers() {
 
     setUpdating(true);
     try {
-      console.log('💾 Updating database...');
+      console.log('💾 Updating database with service role...');
       
-      const updateData = { 
-        role: newRole,
-        updated_at: new Date().toISOString()
-      };
-      
-      console.log('📤 Update payload:', updateData);
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('id', userId)
-        .select(); // Return the updated record
+      // Use the service role key for admin operations
+      const { data, error } = await supabase.rpc('update_user_role', {
+        target_user_id: userId,
+        new_role: newRole
+      });
 
       if (error) {
-        console.error('❌ Database update failed:', error);
-        throw error;
+        console.error('❌ RPC call failed, trying direct update:', error);
+        
+        // Fallback to direct update
+        const { data: directData, error: directError } = await supabase
+          .from('profiles')
+          .update({ 
+            role: newRole,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId)
+          .select();
+
+        if (directError) {
+          console.error('❌ Direct update also failed:', directError);
+          throw directError;
+        }
+        
+        console.log('✅ Direct update successful:', directData);
+      } else {
+        console.log('✅ RPC update successful:', data);
       }
 
-      console.log('✅ Database update successful:', data);
+      // Wait a moment for the database to process
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       // Verify the update by fetching the user again
       console.log('🔍 Verifying update...');
@@ -109,14 +121,20 @@ export default function AdminUsers() {
 
       if (verifyError) {
         console.error('❌ Verification failed:', verifyError);
+        throw verifyError;
       } else {
         console.log('✅ Verification successful. User role in DB:', verifyData.role);
+        
+        if (verifyData.role !== newRole) {
+          console.error('❌ Role was not updated in database. Expected:', newRole, 'Got:', verifyData.role);
+          throw new Error(`Role update failed. Database still shows: ${verifyData.role}`);
+        }
       }
 
-      // Update local state
+      // Update local state with verified data
       console.log('🔄 Updating local state...');
       const updatedUsers = users.map(user => 
-        user.id === userId ? { ...user, role: newRole, updated_at: new Date().toISOString() } : user
+        user.id === userId ? verifyData : user
       );
       setUsers(updatedUsers);
       
@@ -129,6 +147,9 @@ export default function AdminUsers() {
       console.error('💥 Role update failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       alert(`❌ Failed to update user role: ${errorMessage}`);
+      
+      // Reset the editing state on error
+      setEditingUser(null);
     } finally {
       setUpdating(false);
     }
