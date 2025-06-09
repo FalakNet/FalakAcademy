@@ -32,7 +32,7 @@ function App() {
               <Route path="/signup" element={<Signup />} />
               
               {/* Protected routes */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard\" replace />} />
               <Route
                 path="/dashboard"
                 element={
@@ -100,7 +100,7 @@ function App() {
               <Route
                 path="/admin/users"
                 element={
-                  <ProtectedRoute requiredRole="SUPERADMIN" adminOnly>
+                  <ProtectedRoute requiredRole="SUPERADMIN\" adminOnly>
                     <Layout>
                       <AdminUsers />
                     </Layout>
@@ -110,7 +110,7 @@ function App() {
               <Route
                 path="/admin/courses"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
                     <Layout>
                       <AdminCourses />
                     </Layout>
@@ -120,7 +120,7 @@ function App() {
               <Route
                 path="/admin/courses/:courseId/content"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
                     <Layout>
                       <CourseContentManager />
                     </Layout>
@@ -130,7 +130,7 @@ function App() {
               <Route
                 path="/admin/courses/:courseId/enrollments"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
                     <Layout>
                       <CourseEnrollments />
                     </Layout>
@@ -140,7 +140,7 @@ function App() {
               <Route
                 path="/admin/quizzes"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
                     <Layout>
                       <AdminQuizzes />
                     </Layout>
@@ -150,7 +150,7 @@ function App() {
               <Route
                 path="/admin/quiz-analytics/:quizId"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
                     <Layout>
                       <QuizAnalytics />
                     </Layout>
@@ -160,7 +160,7 @@ function App() {
               <Route
                 path="/admin/settings"
                 element={
-                  <ProtectedRoute requiredRole="SUPERADMIN" adminOnly>
+                  <ProtectedRoute requiredRole="SUPERADMIN\" adminOnly>
                     <Layout>
                       <AdminSettings />
                     </Layout>
@@ -169,7 +169,7 @@ function App() {
               />
               
               {/* Catch all route */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard\" replace />} />
             </Routes>
           </Router>
         </AuthProvider>
