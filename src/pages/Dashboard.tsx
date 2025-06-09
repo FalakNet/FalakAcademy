@@ -181,7 +181,6 @@ export default function Dashboard() {
         <StatCard key="users" icon={Users} title="Users" value={stats.totalUsers} color="bg-purple-500" />,
         <StatCard key="courses" icon={BookOpen} title="Courses" value={stats.totalCourses} color="bg-blue-500" />,
         <StatCard key="enrollments" icon={TrendingUp} title="Enrollments" value={stats.totalEnrollments} color="bg-emerald-500" />,
-        <StatCard key="quizzes" icon={Brain} title="Quizzes" value={stats.totalQuizzes} color="bg-orange-500" />
       ];
     } else if (isAdmin()) {
       return [
