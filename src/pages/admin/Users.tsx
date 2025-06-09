@@ -35,73 +35,141 @@ export default function AdminUsers() {
 
   const loadUsers = async () => {
     try {
+      console.log('🔄 Loading users from database...');
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+      console.log('✅ Users loaded successfully:', data?.length || 0, 'users');
       setUsers(data || []);
     } catch (error) {
-      console.error('Error loading users:', error);
+      console.error('❌ Error loading users:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const updateUserRole = async (userId: string, newRole: UserRole) => {
+    console.log('🚀 Starting role update process...');
+    console.log('📋 User ID:', userId);
+    console.log('🔄 New Role:', newRole);
+    console.log('👤 Current User:', profile?.id);
+    console.log('🔑 Is SuperAdmin:', isSuperAdmin());
+
     if (!isSuperAdmin()) {
+      console.error('❌ Permission denied: User is not superadmin');
       alert('You do not have permission to update user roles.');
       return;
     }
 
+    // Find the user being updated
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) {
+      console.error('❌ Target user not found');
+      alert('User not found');
+      return;
+    }
+
+    console.log('📝 Target user:', targetUser.name, '(', targetUser.email, ')');
+    console.log('🔄 Current role:', targetUser.role, '→ New role:', newRole);
+
     setUpdating(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          role: newRole,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+      console.log('💾 Updating database...');
+      
+      const updateData = { 
+        role: newRole,
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log('📤 Update payload:', updateData);
 
-      if (error) throw error;
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updateData)
+        .eq('id', userId)
+        .select(); // Return the updated record
+
+      if (error) {
+        console.error('❌ Database update failed:', error);
+        throw error;
+      }
+
+      console.log('✅ Database update successful:', data);
+
+      // Verify the update by fetching the user again
+      console.log('🔍 Verifying update...');
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (verifyError) {
+        console.error('❌ Verification failed:', verifyError);
+      } else {
+        console.log('✅ Verification successful. User role in DB:', verifyData.role);
+      }
 
       // Update local state
-      setUsers(users.map(user => 
-        user.id === userId ? { ...user, role: newRole } : user
-      ));
+      console.log('🔄 Updating local state...');
+      const updatedUsers = users.map(user => 
+        user.id === userId ? { ...user, role: newRole, updated_at: new Date().toISOString() } : user
+      );
+      setUsers(updatedUsers);
       
       setEditingUser(null);
       
-      // Show success message
-      alert(`User role updated to ${newRole.toLowerCase().replace('_', ' ')} successfully!`);
+      console.log('🎉 Role update completed successfully!');
+      alert(`✅ User role updated to ${newRole.toLowerCase().replace('_', ' ')} successfully!`);
       
     } catch (error) {
-      console.error('Error updating user role:', error);
-      alert('Failed to update user role: ' + (error as any).message);
+      console.error('💥 Role update failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`❌ Failed to update user role: ${errorMessage}`);
     } finally {
       setUpdating(false);
     }
   };
 
   const handleRoleChange = (newRole: UserRole) => {
-    if (!editingUser) return;
+    console.log('🔄 Role selection changed to:', newRole);
+    if (!editingUser) {
+      console.warn('⚠️ No user being edited');
+      return;
+    }
     
     setEditingUser({
       ...editingUser,
       role: newRole
     });
+    console.log('✅ Editing user role updated locally');
   };
 
   const saveRoleChange = async () => {
-    if (!editingUser) return;
+    console.log('💾 Save button clicked');
+    if (!editingUser) {
+      console.warn('⚠️ No user being edited');
+      return;
+    }
+    
+    console.log('📋 Saving role change for:', editingUser.name);
+    console.log('🔄 Role change:', editingUser.role);
     
     await updateUserRole(editingUser.id, editingUser.role);
   };
 
   const cancelEdit = () => {
+    console.log('❌ Edit cancelled');
     setEditingUser(null);
+  };
+
+  const startEdit = (user: Profile) => {
+    console.log('✏️ Starting edit for user:', user.name);
+    console.log('📋 Current role:', user.role);
+    setEditingUser(user);
   };
 
   const deleteUser = async (userId: string) => {
@@ -384,6 +452,18 @@ export default function AdminUsers() {
         </button>
       </div>
 
+      {/* Debug Info */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h3 className="font-medium text-blue-900 mb-2">Debug Information</h3>
+        <div className="text-sm text-blue-800 space-y-1">
+          <p>Current User: {profile?.name} ({profile?.role})</p>
+          <p>Is SuperAdmin: {isSuperAdmin() ? 'Yes' : 'No'}</p>
+          <p>Total Users: {users.length}</p>
+          <p>Editing User: {editingUser ? `${editingUser.name} (${editingUser.role})` : 'None'}</p>
+          <p>Updating: {updating ? 'Yes' : 'No'}</p>
+        </div>
+      </div>
+
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -494,6 +574,9 @@ export default function AdminUsers() {
                           <option value="COURSE_ADMIN">Course Admin</option>
                           <option value="SUPERADMIN">Superadmin</option>
                         </select>
+                        {updating && (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                        )}
                       </div>
                     ) : (
                       getRoleBadge(user.role)
@@ -513,7 +596,7 @@ export default function AdminUsers() {
                         <button
                           onClick={saveRoleChange}
                           disabled={updating}
-                          className="text-green-600 hover:text-green-900 px-2 py-1 text-sm disabled:opacity-50"
+                          className="text-green-600 hover:text-green-900 px-2 py-1 text-sm disabled:opacity-50 font-medium"
                         >
                           {updating ? 'Saving...' : 'Save'}
                         </button>
@@ -529,7 +612,7 @@ export default function AdminUsers() {
                       <div className="flex justify-end space-x-2">
                         {canEditUser(user) ? (
                           <button
-                            onClick={() => setEditingUser(user)}
+                            onClick={() => startEdit(user)}
                             className="text-blue-600 hover:text-blue-900"
                             title="Edit user role"
                           >
