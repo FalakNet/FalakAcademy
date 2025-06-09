@@ -4,6 +4,8 @@ import { supabase, Course, Profile } from '../../lib/supabase';
 import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle, Upload, Image } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CertificateTemplateManager from '../../components/CertificateTemplateManager';
+import ConfirmModal from '../../components/ConfirmModal';
+import AlertModal from '../../components/AlertModal';
 
 export default function AdminCourses() {
   const { profile, isAdmin } = useAuth();
@@ -22,11 +24,65 @@ export default function AdminCourses() {
     is_public: true
   });
 
+  // Modal states
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info';
+    loading?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning',
+    loading: false
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
   useEffect(() => {
     if (isAdmin()) {
       loadCourses();
     }
   }, [profile]);
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const showConfirm = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void, 
+    type: 'danger' | 'warning' | 'info' = 'warning'
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      type,
+      loading: false
+    });
+  };
 
   const loadCourses = async () => {
     try {
@@ -71,9 +127,10 @@ export default function AdminCourses() {
       loadCourses();
       setShowCreateModal(false);
       setNewCourse({ title: '', description: '', is_public: true });
+      showAlert('Success', 'Course created successfully!', 'success');
     } catch (error) {
       console.error('Error creating course:', error);
-      alert('Failed to create course');
+      showAlert('Error', 'Failed to create course', 'error');
     }
   };
 
@@ -96,9 +153,10 @@ export default function AdminCourses() {
         course.id === editingCourse.id ? editingCourse : course
       ));
       setEditingCourse(null);
+      showAlert('Success', 'Course updated successfully!', 'success');
     } catch (error) {
       console.error('Error updating course:', error);
-      alert('Failed to update course');
+      showAlert('Error', 'Failed to update course', 'error');
     }
   };
 
@@ -107,13 +165,13 @@ export default function AdminCourses() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      showAlert('Invalid File', 'Please upload an image file', 'warning');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size must be less than 5MB');
+      showAlert('File Too Large', 'Image size must be less than 5MB', 'warning');
       return;
     }
 
@@ -149,52 +207,55 @@ export default function AdminCourses() {
           : course
       ));
 
-      alert('Background image uploaded successfully!');
+      showAlert('Success', 'Background image uploaded successfully!', 'success');
     } catch (error) {
       console.error('Error uploading background image:', error);
-      alert('Failed to upload background image');
+      showAlert('Upload Failed', 'Failed to upload background image', 'error');
     } finally {
       setUploadingBackground(null);
     }
   };
 
   const removeBackgroundImage = async (courseId: string, imagePath: string) => {
-    if (!confirm('Are you sure you want to remove the background image?')) {
-      return;
-    }
+    showConfirm(
+      'Remove Background Image',
+      'Are you sure you want to remove the background image?',
+      async () => {
+        try {
+          // Delete from storage
+          const { error: deleteError } = await supabase.storage
+            .from('course-backgrounds')
+            .remove([imagePath]);
 
-    try {
-      // Delete from storage
-      const { error: deleteError } = await supabase.storage
-        .from('course-backgrounds')
-        .remove([imagePath]);
+          if (deleteError) {
+            console.warn('Could not delete file from storage:', deleteError);
+          }
 
-      if (deleteError) {
-        console.warn('Could not delete file from storage:', deleteError);
-      }
+          // Update course to remove background image URL
+          const { error: updateError } = await supabase
+            .from('courses')
+            .update({
+              background_image_url: null
+            })
+            .eq('id', courseId);
 
-      // Update course to remove background image URL
-      const { error: updateError } = await supabase
-        .from('courses')
-        .update({
-          background_image_url: null
-        })
-        .eq('id', courseId);
+          if (updateError) throw updateError;
 
-      if (updateError) throw updateError;
+          // Update local state
+          setCourses(courses.map(course => 
+            course.id === courseId 
+              ? { ...course, background_image_url: undefined }
+              : course
+          ));
 
-      // Update local state
-      setCourses(courses.map(course => 
-        course.id === courseId 
-          ? { ...course, background_image_url: undefined }
-          : course
-      ));
-
-      alert('Background image removed successfully!');
-    } catch (error) {
-      console.error('Error removing background image:', error);
-      alert('Failed to remove background image');
-    }
+          showAlert('Success', 'Background image removed successfully!', 'success');
+        } catch (error) {
+          console.error('Error removing background image:', error);
+          showAlert('Error', 'Failed to remove background image', 'error');
+        }
+      },
+      'warning'
+    );
   };
 
   const getBackgroundImageUrl = (course: Course) => {
@@ -210,145 +271,151 @@ export default function AdminCourses() {
   const deleteCourse = async (course: Course) => {
     if (!course) return;
 
-    setDeleting(true);
-    try {
-      // Delete content completions first (references section_content)
-      const { data: sections } = await supabase
-        .from('course_sections')
-        .select('id')
-        .eq('course_id', course.id);
-
-      if (sections && sections.length > 0) {
-        const sectionIds = sections.map(s => s.id);
+    showConfirm(
+      'Delete Course',
+      `Are you sure you want to delete "${course.title}"? This will permanently delete all course content, enrollments, quizzes, and certificates. This action cannot be undone.`,
+      async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
         
-        // Get all content IDs for these sections
-        const { data: contentItems } = await supabase
-          .from('section_content')
-          .select('id')
-          .in('section_id', sectionIds);
+        try {
+          // Delete content completions first (references section_content)
+          const { data: sections } = await supabase
+            .from('course_sections')
+            .select('id')
+            .eq('course_id', course.id);
 
-        if (contentItems && contentItems.length > 0) {
-          const contentIds = contentItems.map(c => c.id);
-          
-          // Delete content completions
+          if (sections && sections.length > 0) {
+            const sectionIds = sections.map(s => s.id);
+            
+            // Get all content IDs for these sections
+            const { data: contentItems } = await supabase
+              .from('section_content')
+              .select('id')
+              .in('section_id', sectionIds);
+
+            if (contentItems && contentItems.length > 0) {
+              const contentIds = contentItems.map(c => c.id);
+              
+              // Delete content completions
+              await supabase
+                .from('content_completions')
+                .delete()
+                .in('content_id', contentIds);
+            }
+          }
+
+          // Delete quiz attempts and questions
+          const { data: quizzes } = await supabase
+            .from('quizzes')
+            .select('id')
+            .eq('course_id', course.id);
+
+          if (quizzes && quizzes.length > 0) {
+            const quizIds = quizzes.map(q => q.id);
+            
+            // Delete quiz attempts
+            await supabase
+              .from('quiz_attempts')
+              .delete()
+              .in('quiz_id', quizIds);
+
+            // Delete questions
+            await supabase
+              .from('questions')
+              .delete()
+              .in('quiz_id', quizIds);
+          }
+
+          // Delete section content
+          if (sections && sections.length > 0) {
+            const sectionIds = sections.map(s => s.id);
+            
+            await supabase
+              .from('section_content')
+              .delete()
+              .in('section_id', sectionIds);
+          }
+
+          // Delete course sections
           await supabase
-            .from('content_completions')
+            .from('course_sections')
             .delete()
-            .in('content_id', contentIds);
+            .eq('course_id', course.id);
+
+          // Delete quizzes
+          await supabase
+            .from('quizzes')
+            .delete()
+            .eq('course_id', course.id);
+
+          // Delete materials
+          await supabase
+            .from('materials')
+            .delete()
+            .eq('course_id', course.id);
+
+          // Delete certificates
+          await supabase
+            .from('certificates')
+            .delete()
+            .eq('course_id', course.id);
+
+          // Delete course completions
+          await supabase
+            .from('course_completions')
+            .delete()
+            .eq('course_id', course.id);
+
+          // Delete assignments
+          await supabase
+            .from('assignments')
+            .delete()
+            .eq('course_id', course.id);
+
+          // Delete course admins
+          await supabase
+            .from('course_admins')
+            .delete()
+            .eq('course_id', course.id);
+
+          // Delete enrollments
+          await supabase
+            .from('enrollments')
+            .delete()
+            .eq('course_id', course.id);
+
+          // Delete background image from storage if exists
+          if (course.background_image_url) {
+            await supabase.storage
+              .from('course-backgrounds')
+              .remove([course.background_image_url]);
+          }
+
+          // Finally, delete the course itself
+          const { error: courseError } = await supabase
+            .from('courses')
+            .delete()
+            .eq('id', course.id);
+
+          if (courseError) {
+            throw new Error(`Failed to delete course: ${courseError.message}`);
+          }
+
+          // Reload courses from database to ensure UI is accurate
+          await loadCourses();
+          
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          showAlert('Success', `Course "${course.title}" and all related data have been successfully deleted.`, 'success');
+        } catch (error) {
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          showAlert('Delete Failed', `Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+          
+          // Reload courses to ensure UI is in sync with database
+          await loadCourses();
         }
-      }
-
-      // Delete quiz attempts and questions
-      const { data: quizzes } = await supabase
-        .from('quizzes')
-        .select('id')
-        .eq('course_id', course.id);
-
-      if (quizzes && quizzes.length > 0) {
-        const quizIds = quizzes.map(q => q.id);
-        
-        // Delete quiz attempts
-        await supabase
-          .from('quiz_attempts')
-          .delete()
-          .in('quiz_id', quizIds);
-
-        // Delete questions
-        await supabase
-          .from('questions')
-          .delete()
-          .in('quiz_id', quizIds);
-      }
-
-      // Delete section content
-      if (sections && sections.length > 0) {
-        const sectionIds = sections.map(s => s.id);
-        
-        await supabase
-          .from('section_content')
-          .delete()
-          .in('section_id', sectionIds);
-      }
-
-      // Delete course sections
-      await supabase
-        .from('course_sections')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete quizzes
-      await supabase
-        .from('quizzes')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete materials
-      await supabase
-        .from('materials')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete certificates
-      await supabase
-        .from('certificates')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete course completions
-      await supabase
-        .from('course_completions')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete assignments
-      await supabase
-        .from('assignments')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete course admins
-      await supabase
-        .from('course_admins')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete enrollments
-      await supabase
-        .from('enrollments')
-        .delete()
-        .eq('course_id', course.id);
-
-      // Delete background image from storage if exists
-      if (course.background_image_url) {
-        await supabase.storage
-          .from('course-backgrounds')
-          .remove([course.background_image_url]);
-      }
-
-      // Finally, delete the course itself
-      const { error: courseError } = await supabase
-        .from('courses')
-        .delete()
-        .eq('id', course.id);
-
-      if (courseError) {
-        throw new Error(`Failed to delete course: ${courseError.message}`);
-      }
-
-      // Reload courses from database to ensure UI is accurate
-      await loadCourses();
-      
-      setShowDeleteModal(null);
-      
-      alert(`Course "${course.title}" and all related data have been successfully deleted.`);
-    } catch (error) {
-      alert(`Failed to delete course: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
-      // Reload courses to ensure UI is in sync with database
-      await loadCourses();
-    } finally {
-      setDeleting(false);
-    }
+      },
+      'danger'
+    );
   };
 
   const toggleCourseVisibility = async (course: Course) => {
@@ -365,7 +432,7 @@ export default function AdminCourses() {
       ));
     } catch (error) {
       console.error('Error updating course visibility:', error);
-      alert('Failed to update course visibility');
+      showAlert('Error', 'Failed to update course visibility', 'error');
     }
   };
 
@@ -558,7 +625,7 @@ export default function AdminCourses() {
                   </div>
                   {canDeleteCourse(course) && (
                     <button
-                      onClick={() => setShowDeleteModal(course)}
+                      onClick={() => deleteCourse(course)}
                       className="text-red-600 hover:text-red-800"
                       title="Delete course"
                     >
@@ -710,68 +777,6 @@ export default function AdminCourses() {
         </div>
       )}
 
-      {/* Delete Course Confirmation Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
-            <div className="p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Delete Course</h3>
-                  <p className="text-sm text-gray-600">This action cannot be undone</p>
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <p className="text-gray-700 mb-4">
-                  Are you sure you want to delete <strong>"{showDeleteModal.title}"</strong>?
-                </p>
-                
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <h4 className="font-medium text-red-800 mb-2">This will permanently delete:</h4>
-                  <ul className="text-sm text-red-700 space-y-1">
-                    <li>• All course content and sections</li>
-                    <li>• All student enrollments and progress</li>
-                    <li>• All quizzes and quiz attempts</li>
-                    <li>• All course materials</li>
-                    <li>• All certificates issued for this course</li>
-                    <li>• Background image and other assets</li>
-                    <li>• All related data and analytics</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3">
-                <button
-                  onClick={() => setShowDeleteModal(null)}
-                  disabled={deleting}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 order-2 sm:order-1 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => deleteCourse(showDeleteModal)}
-                  disabled={deleting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {deleting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2 inline-block"></div>
-                      Deleting...
-                    </>
-                  ) : (
-                    'Delete Course'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Certificate Template Modal */}
       {showCertificateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -797,6 +802,27 @@ export default function AdminCourses() {
           </div>
         </div>
       )}
+
+      {/* Custom Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        loading={confirmModal.loading}
+        confirmText={confirmModal.type === 'danger' ? 'Delete' : 'Confirm'}
+        cancelText="Cancel"
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </div>
   );
 }

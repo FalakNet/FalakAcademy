@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase, Profile, UserRole } from '../../lib/supabase';
 import { Users, Crown, Shield, User, Edit2, Trash2, Plus, ChevronDown, ChevronUp, Filter } from 'lucide-react';
+import ConfirmModal from '../../components/ConfirmModal';
+import AlertModal from '../../components/AlertModal';
+import PasswordModal from '../../components/PasswordModal';
 
 export default function AdminUsers() {
   const { profile, isSuperAdmin, session, refreshProfile } = useAuth();
@@ -11,6 +14,46 @@ export default function AdminUsers() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: 'USER' as UserRole });
   const [updating, setUpdating] = useState(false);
+  const [creating, setCreating] = useState(false);
+  
+  // Modal states
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'warning' | 'info';
+    loading?: boolean;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning',
+    loading: false
+  });
+
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type?: 'success' | 'error' | 'warning' | 'info';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const [passwordModal, setPasswordModal] = useState<{
+    isOpen: boolean;
+    password: string;
+    userName: string;
+  }>({
+    isOpen: false,
+    password: '',
+    userName: ''
+  });
   
   // Sorting and filtering state
   const [sortBy, setSortBy] = useState<'name' | 'role' | 'created_at'>('created_at');
@@ -49,16 +92,41 @@ export default function AdminUsers() {
     }
   };
 
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const showConfirm = (
+    title: string, 
+    message: string, 
+    onConfirm: () => void, 
+    type: 'danger' | 'warning' | 'info' = 'warning'
+  ) => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      type,
+      loading: false
+    });
+  };
+
   const updateUserRole = async (userId: string, newRole: UserRole) => {
     if (!isSuperAdmin()) {
-      alert('You do not have permission to update user roles.');
+      showAlert('Access Denied', 'You do not have permission to update user roles.', 'error');
       return;
     }
 
     // Find the user being updated
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) {
-      alert('User not found');
+      showAlert('Error', 'User not found', 'error');
       return;
     }
 
@@ -111,10 +179,11 @@ export default function AdminUsers() {
       setUsers(updatedUsers);
       
       setEditingUser(null);
+      showAlert('Success', `User role updated to ${newRole.toLowerCase().replace('_', ' ')} successfully!`, 'success');
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to update user role: ${errorMessage}`);
+      showAlert('Update Failed', `Failed to update user role: ${errorMessage}`, 'error');
       
       // Reset the editing state on error
       setEditingUser(null);
@@ -151,78 +220,93 @@ export default function AdminUsers() {
   };
 
   const deleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
+    const userToDelete = users.find(u => u.id === userId);
+    if (!userToDelete) return;
 
-    try {
-      // Refresh profile before attempting deletion to ensure we have the latest role
-      await refreshProfile();
-      
-      // Double-check permissions after refresh
-      if (!isSuperAdmin()) {
-        alert('You do not have permission to delete users. Please contact a superadmin.');
-        return;
-      }
+    showConfirm(
+      'Delete User',
+      `Are you sure you want to delete "${userToDelete.name}"? This action cannot be undone and will permanently remove all user data.`,
+      async () => {
+        setConfirmModal(prev => ({ ...prev, loading: true }));
+        
+        try {
+          // Refresh profile before attempting deletion to ensure we have the latest role
+          await refreshProfile();
+          
+          // Double-check permissions after refresh
+          if (!isSuperAdmin()) {
+            showAlert('Access Denied', 'You do not have permission to delete users. Please contact a superadmin.', 'error');
+            return;
+          }
 
-      // Step 1: Verify user exists in database before deletion
-      const { data: userCheck, error: userCheckError } = await supabase
-        .from('profiles')
-        .select('id, name, email, role')
-        .eq('id', userId)
-        .single();
+          // Step 1: Verify user exists in database before deletion
+          const { data: userCheck, error: userCheckError } = await supabase
+            .from('profiles')
+            .select('id, name, email, role')
+            .eq('id', userId)
+            .single();
 
-      if (userCheckError) {
-        throw new Error(`User not found: ${userCheckError.message}`);
-      }
+          if (userCheckError) {
+            throw new Error(`User not found: ${userCheckError.message}`);
+          }
 
-      // Step 2: Call the delete-user Edge Function
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`;
-      
-      // Use the authenticated user's session token instead of the anonymous key
-      if (!session?.access_token) {
-        throw new Error('No valid session token available');
-      }
+          // Step 2: Call the delete-user Edge Function
+          const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`;
+          
+          // Use the authenticated user's session token instead of the anonymous key
+          if (!session?.access_token) {
+            throw new Error('No valid session token available');
+          }
 
-      const headers = {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      };
+          const headers = {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          };
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ userId })
-      });
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ userId })
+          });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`Failed to delete user: ${response.status} ${errorData}`);
-      }
+          if (!response.ok) {
+            const errorData = await response.text();
+            throw new Error(`Failed to delete user: ${response.status} ${errorData}`);
+          }
 
-      const result = await response.json();
+          const result = await response.json();
 
-      // Step 3: Update local state
-      const originalUsersCount = users.length;
-      const newUsers = users.filter(user => user.id !== userId);
-      setUsers(newUsers);
-      
-      // Step 4: Reload users from database to verify
-      await loadUsers();
-      
-      alert('User deleted successfully');
+          // Step 3: Update local state
+          const newUsers = users.filter(user => user.id !== userId);
+          setUsers(newUsers);
+          
+          // Step 4: Reload users from database to verify
+          await loadUsers();
+          
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          showAlert('Success', 'User deleted successfully', 'success');
 
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      
-      // Reload users to ensure UI is in sync with database
-      await loadUsers();
-      
-      alert(`Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          
+          // Reload users to ensure UI is in sync with database
+          await loadUsers();
+          
+          setConfirmModal(prev => ({ ...prev, isOpen: false }));
+          showAlert('Delete Failed', `Failed to delete user: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        }
+      },
+      'danger'
+    );
   };
 
   const createUser = async () => {
+    if (!newUser.name || !newUser.email) {
+      showAlert('Validation Error', 'Please fill in all required fields.', 'warning');
+      return;
+    }
+
+    setCreating(true);
     try {
       // Generate a temporary password
       const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
@@ -262,11 +346,18 @@ export default function AdminUsers() {
         setShowCreateModal(false);
         setNewUser({ name: '', email: '', role: 'USER' });
         
-        alert(`User created successfully with temporary password: ${tempPassword}\nPlease share this password securely with the user.`);
+        // Show password modal instead of alert
+        setPasswordModal({
+          isOpen: true,
+          password: tempPassword,
+          userName: newUser.name
+        });
       }
     } catch (error) {
       console.error('Error creating user:', error);
-      alert(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showAlert('Creation Failed', `Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -638,21 +729,58 @@ export default function AdminUsers() {
               <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-3 mt-6">
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 order-2 sm:order-1"
+                  disabled={creating}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 order-2 sm:order-1 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={createUser}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 order-1 sm:order-2"
+                  disabled={creating}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 order-1 sm:order-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create User
+                  {creating ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </div>
+                  ) : (
+                    'Create User'
+                  )}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Custom Modals */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        loading={confirmModal.loading}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal(prev => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+
+      <PasswordModal
+        isOpen={passwordModal.isOpen}
+        onClose={() => setPasswordModal(prev => ({ ...prev, isOpen: false }))}
+        password={passwordModal.password}
+        userName={passwordModal.userName}
+      />
     </div>
   );
 }
