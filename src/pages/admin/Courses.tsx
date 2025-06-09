@@ -477,6 +477,8 @@ export default function AdminCourses() {
               </div>
 
               <div className="p-4 sm:p-6 flex flex-col flex-1">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex flex-wrap gap-1">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                       course.is_public 
                         ? 'bg-green-100 text-green-800' 
@@ -495,13 +497,13 @@ export default function AdminCourses() {
                         BG
                       </span>
                     )}
-                    <button
-                      onClick={() => toggleCourseVisibility(course)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      {course.is_public ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    </button>
                   </div>
+                  <button
+                    onClick={() => toggleCourseVisibility(course)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    {course.is_public ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </button>
                 </div>
                 
                 <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
