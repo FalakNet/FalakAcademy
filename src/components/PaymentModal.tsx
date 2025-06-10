@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { Course } from '../lib/supabase';
 import { createPaymentIntent, formatCurrency, getSupportedCurrencies } from '../lib/ziina';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../hooks/useAuth';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -11,17 +13,43 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ isOpen, onClose, course, onPaymentInitiated }: PaymentModalProps) {
+  const { profile } = useAuth();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
   const handlePayment = async () => {
+    if (!profile) {
+      setError('You must be logged in to make a purchase');
+      return;
+    }
+
     setProcessing(true);
     setError(null);
 
     try {
       const baseUrl = window.location.origin;
+      
+      // Create payment record in our database first
+      const { data: paymentRecord, error: paymentError } = await supabase
+        .from('payments')
+        .insert({
+          user_id: profile.id,
+          course_id: course.id,
+          amount: course.price,
+          currency: course.currency,
+          payment_intent_id: '', // Will be updated after Ziina response
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (paymentError) {
+        throw new Error('Failed to create payment record');
+      }
+
+      // Create payment intent with Ziina
       const paymentIntent = await createPaymentIntent({
         amount: course.price,
         currency: course.currency,
@@ -30,6 +58,18 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentInitiat
         test: import.meta.env.DEV, // Use test mode in development
       });
 
+      // Update payment record with Ziina payment intent ID
+      await supabase
+        .from('payments')
+        .update({
+          payment_intent_id: paymentIntent.id
+        })
+        .eq('id', paymentRecord.id);
+
+      // Replace placeholder in URLs with actual payment intent ID
+      const successUrl = paymentIntent.success_url?.replace('{PAYMENT_INTENT_ID}', paymentIntent.id) || 
+                        `${baseUrl}/payment/success?course_id=${course.id}&payment_id=${paymentIntent.id}`;
+      
       onPaymentInitiated(paymentIntent.id, paymentIntent.redirect_url);
     } catch (error) {
       console.error('Payment creation failed:', error);

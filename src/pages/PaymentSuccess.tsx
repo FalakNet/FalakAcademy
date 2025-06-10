@@ -40,16 +40,41 @@ export default function PaymentSuccess() {
       if (courseError) throw courseError;
       setCourse(courseData);
 
+      // Check if payment already exists in our database
+      const { data: existingPayment } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('payment_intent_id', paymentId)
+        .single();
+
+      if (existingPayment && existingPayment.status === 'completed') {
+        // Payment already processed successfully
+        setPaymentStatus('success');
+        setLoading(false);
+        return;
+      }
+
       // Verify payment with Ziina
       const paymentIntent = await verifyPaymentStatus(paymentId);
       
       if (paymentIntent.status === 'completed') {
-        // Payment successful - create enrollment and payment record
+        // Payment successful - process enrollment and payment record
         await processSuccessfulPayment(courseData, paymentIntent);
         setPaymentStatus('success');
-      } else if (paymentIntent.status === 'failed') {
+      } else if (paymentIntent.status === 'failed' || paymentIntent.status === 'canceled') {
         setPaymentStatus('failed');
         setError(paymentIntent.latest_error?.message || 'Payment failed');
+        
+        // Update payment record if it exists
+        if (existingPayment) {
+          await supabase
+            .from('payments')
+            .update({
+              status: paymentIntent.status === 'canceled' ? 'cancelled' : 'failed',
+              error_message: paymentIntent.latest_error?.message || 'Payment failed'
+            })
+            .eq('id', existingPayment.id);
+        }
       } else {
         setPaymentStatus('pending');
       }
@@ -81,13 +106,30 @@ export default function PaymentSuccess() {
             user_id: profile.id,
             course_id: courseData.id,
             amount: paymentIntent.amount,
-            currency: paymentIntent.currency,
+            currency: paymentIntent.currency_code,
             payment_intent_id: paymentId,
             status: 'completed',
-            completed_at: paymentIntent.completed_at
+            completed_at: paymentIntent.completed_at || new Date().toISOString()
           });
 
-        if (paymentError) throw paymentError;
+        if (paymentError) {
+          console.error('Error creating payment record:', paymentError);
+          // Don't throw here - payment was successful, just log the error
+        }
+      } else if (existingPayment.status !== 'completed') {
+        // Update existing payment record
+        const { error: updateError } = await supabase
+          .from('payments')
+          .update({
+            status: 'completed',
+            completed_at: paymentIntent.completed_at || new Date().toISOString(),
+            error_message: null
+          })
+          .eq('id', existingPayment.id);
+
+        if (updateError) {
+          console.error('Error updating payment record:', updateError);
+        }
       }
 
       // Check if enrollment already exists
@@ -99,7 +141,7 @@ export default function PaymentSuccess() {
         .single();
 
       if (!existingEnrollment) {
-        // Create enrollment
+        // Create enrollment - this is the key part for auto-enrollment
         const { error: enrollmentError } = await supabase
           .from('enrollments')
           .insert({
@@ -107,11 +149,14 @@ export default function PaymentSuccess() {
             course_id: courseData.id
           });
 
-        if (enrollmentError) throw enrollmentError;
+        if (enrollmentError) {
+          console.error('Error creating enrollment:', enrollmentError);
+          throw new Error('Payment successful but failed to enroll in course. Please contact support.');
+        }
       }
     } catch (error) {
       console.error('Error processing successful payment:', error);
-      // Don't throw here - payment was successful, just log the error
+      throw error;
     }
   };
 
@@ -121,7 +166,7 @@ export default function PaymentSuccess() {
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Verifying Payment</h2>
-          <p className="text-gray-600 dark:text-gray-400">Please wait while we confirm your payment...</p>
+          <p className="text-gray-600 dark:text-gray-400">Please wait while we confirm your payment and enroll you in the course...</p>
         </div>
       </div>
     );
@@ -141,8 +186,12 @@ export default function PaymentSuccess() {
             🎉 Payment Successful!
           </h1>
           
-          <p className="text-lg text-gray-600 dark:text-gray-400 mb-8">
-            Welcome to your new course! You now have lifetime access to all content.
+          <p className="text-lg text-gray-600 dark:text-gray-400 mb-2">
+            Welcome to your new course! You have been automatically enrolled.
+          </p>
+          
+          <p className="text-sm text-green-600 dark:text-green-400 mb-8 font-medium">
+            ✅ Enrollment completed - You now have lifetime access to all content
           </p>
 
           {/* Course Info */}
