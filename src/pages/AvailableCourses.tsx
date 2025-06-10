@@ -40,15 +40,27 @@ export default function AvailableCourses() {
 
       if (coursesError) throw coursesError;
 
-      // Load user's enrolled courses
-      const { data: enrollments, error: enrollmentsError } = await supabase
-        .from('enrollments')
-        .select('course_id')
-        .eq('user_id', profile.id);
+      // Load user's enrolled courses AND payments
+      const [enrollmentsResponse, paymentsResponse] = await Promise.all([
+        supabase
+          .from('enrollments')
+          .select('course_id')
+          .eq('user_id', profile.id),
+        supabase
+          .from('payments')
+          .select('course_id')
+          .eq('user_id', profile.id)
+          .eq('status', 'completed')
+      ]);
 
-      if (enrollmentsError) throw enrollmentsError;
+      if (enrollmentsResponse.error) throw enrollmentsResponse.error;
+      if (paymentsResponse.error) throw paymentsResponse.error;
 
-      const enrolledIds = new Set(enrollments?.map(e => e.course_id) || []);
+      // Combine enrolled courses and paid courses
+      const enrolledIds = new Set([
+        ...(enrollmentsResponse.data?.map(e => e.course_id) || []),
+        ...(paymentsResponse.data?.map(p => p.course_id) || [])
+      ]);
       
       // Load additional stats for each course
       const coursesWithStats = await Promise.all(

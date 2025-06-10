@@ -13,6 +13,7 @@ export default function PaymentSuccess() {
   const [paymentStatus, setPaymentStatus] = useState<'verifying' | 'success' | 'failed' | 'pending'>('verifying');
   const [course, setCourse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [enrollmentStatus, setEnrollmentStatus] = useState<string>('');
 
   const courseId = searchParams.get('course_id');
   const paymentId = searchParams.get('payment_id');
@@ -30,6 +31,8 @@ export default function PaymentSuccess() {
     if (!courseId || !paymentId || !profile) return;
 
     try {
+      setEnrollmentStatus('Loading course details...');
+      
       // Load course details
       const { data: courseData, error: courseError } = await supabase
         .from('courses')
@@ -40,6 +43,8 @@ export default function PaymentSuccess() {
       if (courseError) throw courseError;
       setCourse(courseData);
 
+      setEnrollmentStatus('Checking payment status...');
+
       // Check if payment already exists in our database
       const { data: existingPayment } = await supabase
         .from('payments')
@@ -48,16 +53,21 @@ export default function PaymentSuccess() {
         .single();
 
       if (existingPayment && existingPayment.status === 'completed') {
-        // Payment already processed successfully
+        // Payment already processed successfully, check enrollment
+        setEnrollmentStatus('Payment confirmed, checking enrollment...');
+        await ensureEnrollment(courseData, existingPayment);
         setPaymentStatus('success');
         setLoading(false);
         return;
       }
 
+      setEnrollmentStatus('Verifying payment with payment provider...');
+
       // Verify payment with Ziina
       const paymentIntent = await verifyPaymentStatus(paymentId);
       
       if (paymentIntent.status === 'completed') {
+        setEnrollmentStatus('Payment successful, processing enrollment...');
         // Payment successful - process enrollment and payment record
         await processSuccessfulPayment(courseData, paymentIntent);
         setPaymentStatus('success');
@@ -87,10 +97,50 @@ export default function PaymentSuccess() {
     }
   };
 
+  const ensureEnrollment = async (courseData: any, paymentRecord: any) => {
+    if (!profile) return;
+
+    try {
+      // Check if enrollment already exists
+      const { data: existingEnrollment } = await supabase
+        .from('enrollments')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('course_id', courseData.id)
+        .single();
+
+      if (!existingEnrollment) {
+        setEnrollmentStatus('Creating enrollment...');
+        
+        // Create enrollment
+        const { error: enrollmentError } = await supabase
+          .from('enrollments')
+          .insert({
+            user_id: profile.id,
+            course_id: courseData.id
+          });
+
+        if (enrollmentError) {
+          console.error('Error creating enrollment:', enrollmentError);
+          throw new Error('Failed to enroll in course. Please contact support.');
+        }
+        
+        setEnrollmentStatus('Enrollment completed successfully!');
+      } else {
+        setEnrollmentStatus('Already enrolled in course');
+      }
+    } catch (error) {
+      console.error('Error ensuring enrollment:', error);
+      throw error;
+    }
+  };
+
   const processSuccessfulPayment = async (courseData: any, paymentIntent: any) => {
     if (!profile) return;
 
     try {
+      setEnrollmentStatus('Recording payment...');
+
       // Check if payment record already exists
       const { data: existingPayment } = await supabase
         .from('payments')
@@ -132,6 +182,8 @@ export default function PaymentSuccess() {
         }
       }
 
+      setEnrollmentStatus('Checking enrollment status...');
+
       // Check if enrollment already exists
       const { data: existingEnrollment } = await supabase
         .from('enrollments')
@@ -141,6 +193,8 @@ export default function PaymentSuccess() {
         .single();
 
       if (!existingEnrollment) {
+        setEnrollmentStatus('Creating course enrollment...');
+        
         // Create enrollment - this is the key part for auto-enrollment
         const { error: enrollmentError } = await supabase
           .from('enrollments')
@@ -153,6 +207,10 @@ export default function PaymentSuccess() {
           console.error('Error creating enrollment:', enrollmentError);
           throw new Error('Payment successful but failed to enroll in course. Please contact support.');
         }
+        
+        setEnrollmentStatus('Successfully enrolled in course!');
+      } else {
+        setEnrollmentStatus('Already enrolled in course');
       }
     } catch (error) {
       console.error('Error processing successful payment:', error);
@@ -165,8 +223,15 @@ export default function PaymentSuccess() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 w-full max-w-md text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-6"></div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Verifying Payment</h2>
-          <p className="text-gray-600 dark:text-gray-400">Please wait while we confirm your payment and enroll you in the course...</p>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Processing Payment</h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            {enrollmentStatus || 'Please wait while we process your payment...'}
+          </p>
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
+            <p className="text-sm text-blue-600 dark:text-blue-400">
+              This may take a few moments. Please don't close this page.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -275,14 +340,14 @@ export default function PaymentSuccess() {
 
           <button
             onClick={verifyPayment}
-            className="w-full bg-yellow-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-yellow-700 transition-colors"
+            className="w-full bg-yellow-600 text-white py-3 px-6 rounded-xl font-semibold hover:bg-yellow-700 transition-colors mb-4"
           >
             Check Status Again
           </button>
 
           <Link
             to="/my-courses"
-            className="block mt-4 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            className="block text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
           >
             Return to My Courses
           </Link>
