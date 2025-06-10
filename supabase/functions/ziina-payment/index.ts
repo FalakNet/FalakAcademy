@@ -45,9 +45,9 @@ serve(async (req) => {
     const path = url.pathname.replace('/functions/v1/ziina-payment', '');
 
     // Get API key from environment
-    const apiKey = Deno.env.get('ZIINA_API_KEY');
+    const apiKey = Deno.env.get('VITE_ZIINA_API_KEY');
     if (!apiKey) {
-      throw new Error('ZIINA_API_KEY environment variable is required');
+      throw new Error('VITE_ZIINA_API_KEY environment variable is required');
     }
 
     const headers = {
