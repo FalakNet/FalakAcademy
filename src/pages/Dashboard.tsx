@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, Course, Enrollment } from '../lib/supabase';
-import { BookOpen, Users, Brain, FileText, TrendingUp, Clock, Settings, Crown, Shield } from 'lucide-react';
+import { BookOpen, Users, Brain, FileText, TrendingUp, Clock, Settings, Crown, Shield, ChevronRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const { profile, isSuperAdmin, isAdmin } = useAuth();
@@ -280,6 +281,17 @@ export default function Dashboard() {
     return "Recent Courses";
   };
 
+  // Helper function to get the correct course link based on user role
+  const getCourseLink = (course: Course) => {
+    if (isSuperAdmin() || isAdmin()) {
+      // Admins go to course content management
+      return `/admin/courses/${course.id}/content`;
+    } else {
+      // Regular users go to course detail page
+      return `/courses/${course.id}`;
+    }
+  };
+
   return (
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
@@ -307,32 +319,39 @@ export default function Dashboard() {
           {recentCourses.length > 0 ? (
             <div className="space-y-3 sm:space-y-4">
               {recentCourses.map((course) => (
-                <div key={course.id} className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <Link
+                  key={course.id}
+                  to={getCourseLink(course)}
+                  className="flex items-center justify-between p-3 sm:p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors group"
+                >
                   <div className="flex items-center min-w-0 flex-1">
                     <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
                       <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="ml-3 min-w-0 flex-1">
-                      <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate">{course.title}</h3>
+                      <h3 className="text-sm font-medium text-gray-900 dark:text-white truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {course.title}
+                      </h3>
                       <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{course.description}</p>
                     </div>
                   </div>
                   <div className="flex items-center text-xs sm:text-sm text-gray-500 dark:text-gray-400 ml-3 flex-shrink-0">
                     <Clock className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                    <span className="hidden sm:inline">
+                    <span className="hidden sm:inline mr-2">
                       {course.enrolled_at 
                         ? new Date(course.enrolled_at).toLocaleDateString()
                         : new Date(course.created_at).toLocaleDateString()
                       }
                     </span>
-                    <span className="sm:hidden">
+                    <span className="sm:hidden mr-2">
                       {course.enrolled_at 
                         ? new Date(course.enrolled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                         : new Date(course.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                       }
                     </span>
+                    <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors" />
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
@@ -363,9 +382,9 @@ export default function Dashboard() {
         <div className="p-4 sm:p-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {getQuickActions().map((action, index) => (
-              <a
+              <Link
                 key={index}
-                href={action.href}
+                to={action.href}
                 className={`flex items-center p-3 sm:p-4 rounded-lg transition-colors ${action.color}`}
               >
                 <action.icon className={`w-6 h-6 sm:w-8 sm:h-8 mr-3 flex-shrink-0 ${action.iconColor}`} />
@@ -373,7 +392,7 @@ export default function Dashboard() {
                   <h3 className="font-medium text-gray-900 dark:text-white text-sm sm:text-base">{action.title}</h3>
                   <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate">{action.description}</p>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
         </div>
