@@ -9,6 +9,7 @@ import {
   ChevronLeft, Menu, X, Trophy, Star, Target, AlertCircle
 } from 'lucide-react';
 import CertificateGenerator from '../components/CertificateGenerator';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 
 interface SectionWithContent extends CourseSection {
   content: SectionContent[];
@@ -506,9 +507,10 @@ export default function CourseDetail() {
       case 'text':
         return (
           <div className="prose max-w-none dark:prose-invert">
-            <div className="whitespace-pre-wrap text-gray-900 dark:text-white leading-relaxed">
-              {contentData.text || 'No text content available.'}
-            </div>
+            <MarkdownRenderer 
+              content={contentData.text || 'No text content available.'} 
+              className="text-gray-900 dark:text-white"
+            />
           </div>
         );
 
@@ -538,16 +540,20 @@ export default function CourseDetail() {
             {contentData.description && (
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-2">About this video</h4>
-                <p className="text-gray-700 dark:text-gray-300">{contentData.description}</p>
+                <MarkdownRenderer 
+                  content={contentData.description} 
+                  className="text-gray-700 dark:text-gray-300"
+                />
               </div>
             )}
 
             {contentData.transcript && (
               <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                 <h4 className="font-medium text-gray-900 dark:text-white mb-2">Transcript</h4>
-                <div className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {contentData.transcript}
-                </div>
+                <MarkdownRenderer 
+                  content={contentData.transcript} 
+                  className="text-sm text-gray-700 dark:text-gray-300"
+                />
               </div>
             )}
           </div>
@@ -564,7 +570,12 @@ export default function CourseDetail() {
                   className="max-w-full h-auto rounded-lg shadow-sm mx-auto"
                 />
                 {contentData.caption && (
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400 italic">{contentData.caption}</p>
+                  <div className="mt-2">
+                    <MarkdownRenderer 
+                      content={contentData.caption} 
+                      className="text-sm text-gray-600 dark:text-gray-400 italic"
+                    />
+                  </div>
                 )}
               </div>
             ) : (
@@ -587,7 +598,12 @@ export default function CourseDetail() {
                     {contentData.filename || 'Download File'}
                   </h4>
                   {contentData.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{contentData.description}</p>
+                    <div className="mt-1">
+                      <MarkdownRenderer 
+                        content={contentData.description} 
+                        className="text-sm text-gray-600 dark:text-gray-400"
+                      />
+                    </div>
                   )}
                 </div>
                 {contentData.url && (
@@ -625,7 +641,10 @@ export default function CourseDetail() {
               {contentData.instructions && (
                 <div className="mb-4">
                   <h5 className="font-medium text-gray-900 dark:text-white mb-2">Instructions</h5>
-                  <p className="text-gray-700 dark:text-gray-300">{contentData.instructions}</p>
+                  <MarkdownRenderer 
+                    content={contentData.instructions} 
+                    className="text-gray-700 dark:text-gray-300"
+                  />
                 </div>
               )}
 

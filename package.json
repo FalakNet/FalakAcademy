@@ -16,7 +16,10 @@
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.20.1"
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^6.20.1",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
