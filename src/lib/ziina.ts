@@ -47,6 +47,38 @@ function getApiKey(): string {
 }
 
 /**
+ * Get Ziina test mode setting from platform settings
+ */
+async function getTestMode(): Promise<boolean> {
+  try {
+    // Import supabase here to avoid circular dependencies
+    const { supabase } = await import('./supabase');
+    
+    const { data, error } = await supabase
+      .from('admin_settings')
+      .select('setting_value')
+      .eq('setting_key', 'ziina_test_mode')
+      .single();
+
+    if (error || !data) {
+      // Default to test mode if setting not found
+      return true;
+    }
+
+    // Parse the JSON value
+    try {
+      return JSON.parse(data.setting_value) === true;
+    } catch {
+      // If parsing fails, default to test mode
+      return true;
+    }
+  } catch {
+    // If any error occurs, default to test mode for safety
+    return true;
+  }
+}
+
+/**
  * Create headers for Ziina API requests
  */
 function createHeaders(): HeadersInit {
@@ -125,6 +157,9 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     // Validate amount for currency
     validateAmount(params.amount, params.currency);
     
+    // Get test mode from platform settings
+    const testMode = await getTestMode();
+    
     const response = await fetch(`${ZIINA_BASE_URL}/payment_intent`, {
       method: 'POST',
       headers: createHeaders(),
@@ -133,7 +168,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
         currency: params.currency.toUpperCase(),
         success_url: params.success_url,
         cancel_url: params.cancel_url,
-        test: params.test || false,
+        test: testMode, // Use platform setting instead of params.test
       }),
     });
     

@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { 
   Settings, Database, Users, Shield, Mail, Globe, Save, AlertCircle, 
   Upload, Image, Palette, Eye, EyeOff, CheckCircle, X, Monitor,
-  FileText, Lock, HelpCircle, Trash2
+  FileText, Lock, HelpCircle, Trash2, CreditCard
 } from 'lucide-react';
 
 interface AdminSetting {
@@ -23,7 +23,7 @@ export default function AdminSettings() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [settings, setSettings] = useState<Record<string, AdminSetting>>({});
   const [uploadingAssets, setUploadingAssets] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<'branding' | 'general' | 'features' | 'legal' | 'system'>('branding');
+  const [activeTab, setActiveTab] = useState<'branding' | 'general' | 'features' | 'legal' | 'system' | 'payments'>('branding');
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   
   const [stats, setStats] = useState({
@@ -410,6 +410,7 @@ export default function AdminSettings() {
     { id: 'branding', name: 'Branding', icon: Palette },
     { id: 'general', name: 'General', icon: Settings },
     { id: 'features', name: 'Features', icon: Monitor },
+    { id: 'payments', name: 'Payments', icon: CreditCard },
     { id: 'legal', name: 'Legal', icon: FileText },
     { id: 'system', name: 'System', icon: Database }
   ];
@@ -508,6 +509,31 @@ export default function AdminSettings() {
                   {renderSettingInput(setting)}
                 </div>
               ))}
+
+              {/* Payments Tab Additional Content */}
+              {activeTab === 'payments' && (
+                <div className="border-t border-gray-200 pt-6 mt-8">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div className="flex items-start">
+                      <CreditCard className="w-5 h-5 text-blue-600 mt-0.5 mr-2" />
+                      <div>
+                        <h4 className="text-sm font-medium text-blue-800">Ziina Payment Gateway</h4>
+                        <p className="text-sm text-blue-600 mt-1">
+                          Configure payment settings for course purchases. Test mode allows you to test payments without real charges.
+                        </p>
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs text-blue-600">
+                            <strong>Test Mode:</strong> Use any card number (e.g., 4242424242424242), any future expiry date, and any CVV.
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            <strong>Production Mode:</strong> Real payments will be processed using actual payment methods.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* System Tab Additional Content */}
               {activeTab === 'system' && (
