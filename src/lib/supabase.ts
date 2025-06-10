@@ -83,6 +83,7 @@ export interface Course {
   certificate_template_url?: string;
   certificate_settings?: CertificateSettings;
   background_image_url?: string;
+  enable_certificates: boolean;
 }
 
 export interface Payment {
