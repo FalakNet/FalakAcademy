@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { Course } from '../lib/supabase';
-import { createPaymentIntent, formatCurrency, getSupportedCurrencies } from '../lib/ziina';
+import { createPaymentIntent, verifyPaymentStatus, formatCurrency, getSupportedCurrencies } from '../lib/ziina';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
@@ -19,6 +19,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   const [monitoring, setMonitoring] = useState(false);
   const [paymentTab, setPaymentTab] = useState<Window | null>(null);
   const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
+  const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
@@ -59,6 +60,9 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
         console.error('Error creating payment record:', paymentError);
       }
 
+      // Store payment ID for monitoring
+      setCurrentPaymentId(paymentIntent.id);
+
       // Open payment page in new tab
       const newTab = window.open(paymentIntent.redirect_url, '_blank');
       setPaymentTab(newTab);
@@ -87,23 +91,14 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
           return;
         }
 
-        // Check payment status in our database
-        const { data: payment, error } = await supabase
-          .from('payments')
-          .select('status')
-          .eq('payment_intent_id', paymentIntentId)
-          .single();
+        // Check payment status directly with Ziina
+        const paymentStatus = await verifyPaymentStatus(paymentIntentId);
 
-        if (error) {
-          console.error('Error checking payment status:', error);
-          return;
-        }
-
-        if (payment?.status === 'completed') {
+        if (paymentStatus.status === 'completed') {
           // Payment successful - enroll user and close tab
-          await handlePaymentSuccess(tab);
+          await handlePaymentSuccess(tab, paymentStatus);
           stopMonitoring();
-        } else if (payment?.status === 'failed' || payment?.status === 'cancelled') {
+        } else if (paymentStatus.status === 'failed' || paymentStatus.status === 'canceled') {
           // Payment failed - close tab and show error
           tab.close();
           setError('Payment was not completed. Please try again.');
@@ -111,6 +106,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
         }
       } catch (error) {
         console.error('Error monitoring payment:', error);
+        // Continue monitoring - might be a temporary network issue
       }
     }, 2000); // Check every 2 seconds
 
@@ -128,8 +124,17 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
     }, 10 * 60 * 1000);
   };
 
-  const handlePaymentSuccess = async (tab: Window) => {
+  const handlePaymentSuccess = async (tab: Window, paymentStatus: any) => {
     try {
+      // Update payment record in our database
+      await supabase
+        .from('payments')
+        .update({
+          status: 'completed',
+          completed_at: paymentStatus.completed_at || new Date().toISOString()
+        })
+        .eq('payment_intent_id', paymentStatus.id);
+
       // Enroll user in the course
       const { error: enrollmentError } = await supabase
         .from('enrollments')
@@ -166,6 +171,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
     }
     setMonitoring(false);
     setPaymentTab(null);
+    setCurrentPaymentId(null);
   };
 
   const handleClose = () => {
