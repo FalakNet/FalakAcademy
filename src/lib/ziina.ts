@@ -33,19 +33,6 @@ export interface ZiinaError {
   };
 }
 
-const ZIINA_BASE_URL = 'https://api.ziina.com';
-
-/**
- * Get Ziina API key from environment variables
- */
-function getApiKey(): string {
-  const apiKey = import.meta.env.VITE_ZIINA_API_KEY;
-  if (!apiKey) {
-    throw new Error('VITE_ZIINA_API_KEY environment variable is required');
-  }
-  return apiKey;
-}
-
 /**
  * Get Ziina test mode setting from platform settings
  */
@@ -79,16 +66,6 @@ async function getTestMode(): Promise<boolean> {
 }
 
 /**
- * Create headers for Ziina API requests
- */
-function createHeaders(): HeadersInit {
-  return {
-    'Authorization': `Bearer ${getApiKey()}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-/**
  * Handle API response and errors
  */
 async function handleResponse<T>(response: Response): Promise<T> {
@@ -96,13 +73,13 @@ async function handleResponse<T>(response: Response): Promise<T> {
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     
     try {
-      const errorData: ZiinaError = await response.json();
-      errorMessage = errorData.error.message || errorMessage;
+      const errorData = await response.json();
+      errorMessage = errorData.error || errorMessage;
     } catch {
       // If we can't parse the error response, use the default message
     }
     
-    throw new Error(`Ziina API Error: ${errorMessage}`);
+    throw new Error(errorMessage);
   }
   
   return response.json();
@@ -133,7 +110,7 @@ function validateAmount(amount: number, currency: string): void {
 }
 
 /**
- * Create a payment intent with Ziina
+ * Create a payment intent with Ziina via Supabase Edge Function
  */
 export async function createPaymentIntent(params: CreatePaymentParams): Promise<PaymentIntentResponse> {
   try {
@@ -160,9 +137,17 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
     // Get test mode from platform settings
     const testMode = await getTestMode();
     
-    const response = await fetch(`${ZIINA_BASE_URL}/payment_intent`, {
+    // Use Supabase Edge Function as proxy
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ziina-payment/create-payment-intent`;
+    
+    const headers = {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    const response = await fetch(apiUrl, {
       method: 'POST',
-      headers: createHeaders(),
+      headers,
       body: JSON.stringify({
         amount: params.amount,
         currency: params.currency.toUpperCase(),
@@ -183,7 +168,7 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
 }
 
 /**
- * Verify payment status by payment intent ID
+ * Verify payment status by payment intent ID via Supabase Edge Function
  */
 export async function verifyPaymentStatus(paymentIntentId: string): Promise<PaymentIntentResponse> {
   try {
@@ -191,9 +176,17 @@ export async function verifyPaymentStatus(paymentIntentId: string): Promise<Paym
       throw new Error('Payment Intent ID is required');
     }
     
-    const response = await fetch(`${ZIINA_BASE_URL}/payment_intent/${paymentIntentId}`, {
+    // Use Supabase Edge Function as proxy
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ziina-payment/verify-payment/${paymentIntentId}`;
+    
+    const headers = {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    const response = await fetch(apiUrl, {
       method: 'GET',
-      headers: createHeaders(),
+      headers,
     });
     
     return handleResponse<PaymentIntentResponse>(response);
