@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, Course } from '../lib/supabase';
-import { BookOpen, Clock, Users, ChevronRight, Check, Info, X, Calendar, Eye, FileText } from 'lucide-react';
+import { BookOpen, Clock, Users, ChevronRight, Check, Info, X, Calendar, Eye, FileText, CreditCard, Crown, Star } from 'lucide-react';
+import { formatCurrency } from '../lib/ziina';
+import PaymentModal from '../components/PaymentModal';
 
 interface CourseWithStats extends Course {
   enrollmentCount?: number;
@@ -17,6 +19,9 @@ export default function AvailableCourses() {
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<CourseWithStats | null>(null);
   const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentCourse, setPaymentCourse] = useState<CourseWithStats | null>(null);
+  const [filter, setFilter] = useState<'all' | 'free' | 'paid'>('all');
 
   useEffect(() => {
     loadAvailableCourses();
@@ -127,6 +132,23 @@ export default function AvailableCourses() {
     }
   };
 
+  const handlePurchase = (course: CourseWithStats) => {
+    setPaymentCourse(course);
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentInitiated = (paymentIntentId: string, redirectUrl: string) => {
+    // Store payment info in localStorage for verification later
+    localStorage.setItem('pendingPayment', JSON.stringify({
+      paymentIntentId,
+      courseId: paymentCourse?.id,
+      timestamp: Date.now()
+    }));
+
+    // Redirect to Ziina payment page
+    window.location.href = redirectUrl;
+  };
+
   const showCourseInfo = (course: CourseWithStats) => {
     setSelectedCourse(course);
     setShowInfoModal(true);
@@ -142,6 +164,12 @@ export default function AvailableCourses() {
     return data.publicUrl;
   };
 
+  const filteredCourses = courses.filter(course => {
+    if (filter === 'free') return course.course_type === 'free';
+    if (filter === 'paid') return course.course_type === 'paid';
+    return true;
+  });
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-64">
@@ -153,20 +181,60 @@ export default function AvailableCourses() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Available Courses</h1>
-        <p className="mt-2 text-gray-600">
-          Discover and enroll in courses to expand your knowledge.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Available Courses</h1>
+          <p className="mt-2 text-gray-600">
+            Discover and enroll in courses to expand your knowledge.
+          </p>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="mt-4 sm:mt-0">
+          <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <button
+              onClick={() => setFilter('all')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filter === 'all'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              All Courses
+            </button>
+            <button
+              onClick={() => setFilter('free')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filter === 'free'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Free
+            </button>
+            <button
+              onClick={() => setFilter('paid')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                filter === 'paid'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Premium
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Courses Grid */}
-      {courses.length > 0 ? (
+      {filteredCourses.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) => {
+          {filteredCourses.map((course) => {
             const isEnrolled = enrolledCourseIds.has(course.id);
             const isEnrolling = enrollingCourseId === course.id;
             const backgroundImageUrl = getBackgroundImageUrl(course);
+            const isPaid = course.course_type === 'paid';
+            const price = course.price && course.currency ? formatCurrency(course.price, course.currency) : null;
 
             return (
               <div key={course.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full">
@@ -184,11 +252,25 @@ export default function AvailableCourses() {
                     </div>
                   )}
                   
-                  {/* Course Status Overlay */}
-                  <div className="absolute top-3 right-3">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100/90 text-green-800 backdrop-blur-sm">
-                      Public
-                    </span>
+                  {/* Course Status Overlays */}
+                  <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100/90 text-green-800 backdrop-blur-sm">
+                        Public
+                      </span>
+                      {isPaid && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white backdrop-blur-sm flex items-center">
+                          <Crown className="w-3 h-3 mr-1" />
+                          Premium
+                        </span>
+                      )}
+                    </div>
+                    
+                    {isPaid && price && (
+                      <span className="px-3 py-1 text-sm font-bold rounded-full bg-white/90 text-gray-900 backdrop-blur-sm">
+                        {price}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -214,6 +296,12 @@ export default function AvailableCourses() {
                       <FileText className="w-3 h-3 mr-1" />
                       <span>{course.contentCount || 0} lessons</span>
                     </div>
+                    {isPaid && (
+                      <div className="flex items-center">
+                        <Star className="w-3 h-3 mr-1 text-yellow-500" />
+                        <span className="text-yellow-600">Premium</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Spacer to push buttons to bottom */}
@@ -239,6 +327,14 @@ export default function AvailableCourses() {
                         <Check className="w-4 h-4 mr-2" />
                         Enrolled
                       </button>
+                    ) : isPaid ? (
+                      <button
+                        onClick={() => handlePurchase(course)}
+                        className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-sm font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Purchase {price}
+                      </button>
                     ) : (
                       <button
                         onClick={() => handleEnroll(course.id)}
@@ -252,7 +348,7 @@ export default function AvailableCourses() {
                           </>
                         ) : (
                           <>
-                            Enroll Now
+                            Enroll Free
                             <ChevronRight className="w-4 h-4 ml-1" />
                           </>
                         )}
@@ -269,7 +365,12 @@ export default function AvailableCourses() {
           <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">No courses available</h2>
           <p className="text-gray-600">
-            There are no public courses available at the moment. Check back later!
+            {filter === 'free' 
+              ? 'No free courses available at the moment.'
+              : filter === 'paid'
+              ? 'No premium courses available at the moment.'
+              : 'There are no public courses available at the moment.'
+            } Check back later!
           </p>
         </div>
       )}
@@ -306,15 +407,34 @@ export default function AvailableCourses() {
 
               {/* Course Title Overlay */}
               <div className="absolute bottom-4 left-6 right-6">
-                <h2 className="text-2xl font-bold text-white mb-2">{selectedCourse.title}</h2>
-                <div className="flex items-center space-x-4 text-white/90 text-sm">
-                  <span className="px-2 py-1 bg-green-500/80 rounded-full text-xs font-medium">
-                    Public Course
-                  </span>
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 mr-1" />
-                    <span>{selectedCourse.enrollmentCount || 0} enrolled</span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white mb-2">{selectedCourse.title}</h2>
+                    <div className="flex items-center space-x-4 text-white/90 text-sm">
+                      <span className="px-2 py-1 bg-green-500/80 rounded-full text-xs font-medium">
+                        Public Course
+                      </span>
+                      {selectedCourse.course_type === 'paid' && (
+                        <span className="px-2 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full text-xs font-medium flex items-center">
+                          <Crown className="w-3 h-3 mr-1" />
+                          Premium
+                        </span>
+                      )}
+                      <div className="flex items-center">
+                        <Users className="w-4 h-4 mr-1" />
+                        <span>{selectedCourse.enrollmentCount || 0} enrolled</span>
+                      </div>
+                    </div>
                   </div>
+                  
+                  {selectedCourse.course_type === 'paid' && selectedCourse.price && selectedCourse.currency && (
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-white">
+                        {formatCurrency(selectedCourse.price, selectedCourse.currency)}
+                      </div>
+                      <div className="text-sm text-white/80">One-time payment</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -340,8 +460,10 @@ export default function AvailableCourses() {
                   <div className="text-sx md:text-sm text-green-800">Lessons</div>
                 </div>
                 <div className="bg-orange-50 rounded-lg p-4 text-center">
-                  <div className="text-l lg:text-2xl md:text-xl font-bold text-orange-600">Free</div>
-                  <div className="text-sx md:text-sm text-orange-800">Price</div>
+                  <div className="text-l lg:text-2xl md:text-xl font-bold text-orange-600">
+                    {selectedCourse.course_type === 'paid' ? 'Premium' : 'Free'}
+                  </div>
+                  <div className="text-sx md:text-sm text-orange-800">Access</div>
                 </div>
               </div>
 
@@ -384,6 +506,21 @@ export default function AvailableCourses() {
                     })}
                   </span>
                 </div>
+
+                {selectedCourse.course_type === 'paid' && (
+                  <div className="flex items-center justify-between py-3 border-b border-gray-100">
+                    <div className="flex items-center">
+                      <CreditCard className="w-5 h-5 text-gray-400 mr-3" />
+                      <span className="text-gray-700">Price</span>
+                    </div>
+                    <span className="text-gray-900 font-medium">
+                      {selectedCourse.price && selectedCourse.currency 
+                        ? formatCurrency(selectedCourse.price, selectedCourse.currency)
+                        : 'Not set'
+                      }
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Action Button */}
@@ -395,6 +532,22 @@ export default function AvailableCourses() {
                   >
                     <Check className="w-5 h-5 mr-2" />
                     Already Enrolled
+                  </button>
+                ) : selectedCourse.course_type === 'paid' ? (
+                  <button
+                    onClick={() => {
+                      setShowInfoModal(false);
+                      handlePurchase(selectedCourse);
+                    }}
+                    className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-lg font-medium rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200"
+                  >
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Purchase Course
+                    {selectedCourse.price && selectedCourse.currency && (
+                      <span className="ml-2">
+                        {formatCurrency(selectedCourse.price, selectedCourse.currency)}
+                      </span>
+                    )}
                   </button>
                 ) : (
                   <button
@@ -422,6 +575,19 @@ export default function AvailableCourses() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && paymentCourse && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => {
+            setShowPaymentModal(false);
+            setPaymentCourse(null);
+          }}
+          course={paymentCourse}
+          onPaymentInitiated={handlePaymentInitiated}
+        />
       )}
     </div>
   );

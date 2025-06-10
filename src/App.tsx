@@ -12,6 +12,8 @@ import AvailableCourses from './pages/AvailableCourses';
 import CourseDetail from './pages/CourseDetail';
 import QuizTaking from './pages/QuizTaking';
 import Certificates from './pages/Certificates';
+import PaymentSuccess from './pages/PaymentSuccess';
+import PaymentCancel from './pages/PaymentCancel';
 import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
 import CourseContentManager from './pages/admin/CourseContentManager';
@@ -31,8 +33,12 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/signup" element={<Signup />} />
               
+              {/* Payment routes */}
+              <Route path="/payment/success" element={<PaymentSuccess />} />
+              <Route path="/payment/cancel" element={<PaymentCancel />} />
+              
               {/* Protected routes */}
-              <Route path="/" element={<Navigate to="/dashboard\" replace />} />
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route
                 path="/dashboard"
                 element={
@@ -100,7 +106,7 @@ function App() {
               <Route
                 path="/admin/users"
                 element={
-                  <ProtectedRoute requiredRole="SUPERADMIN\" adminOnly>
+                  <ProtectedRoute requiredRole="SUPERADMIN" adminOnly>
                     <Layout>
                       <AdminUsers />
                     </Layout>
@@ -110,7 +116,7 @@ function App() {
               <Route
                 path="/admin/courses"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
                     <Layout>
                       <AdminCourses />
                     </Layout>
@@ -120,7 +126,7 @@ function App() {
               <Route
                 path="/admin/courses/:courseId/content"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
                     <Layout>
                       <CourseContentManager />
                     </Layout>
@@ -130,7 +136,7 @@ function App() {
               <Route
                 path="/admin/courses/:courseId/enrollments"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
                     <Layout>
                       <CourseEnrollments />
                     </Layout>
@@ -140,7 +146,7 @@ function App() {
               <Route
                 path="/admin/quizzes"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
                     <Layout>
                       <AdminQuizzes />
                     </Layout>
@@ -150,7 +156,7 @@ function App() {
               <Route
                 path="/admin/quiz-analytics/:quizId"
                 element={
-                  <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
+                  <ProtectedRoute requiredRole="COURSE_ADMIN" adminOnly>
                     <Layout>
                       <QuizAnalytics />
                     </Layout>
@@ -160,7 +166,7 @@ function App() {
               <Route
                 path="/admin/settings"
                 element={
-                  <ProtectedRoute requiredRole="SUPERADMIN\" adminOnly>
+                  <ProtectedRoute requiredRole="SUPERADMIN" adminOnly>
                     <Layout>
                       <AdminSettings />
                     </Layout>
@@ -169,7 +175,7 @@ function App() {
               />
               
               {/* Catch all route */}
-              <Route path="*" element={<Navigate to="/dashboard\" replace />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </Router>
         </AuthProvider>

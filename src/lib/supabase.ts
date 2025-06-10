@@ -57,6 +57,8 @@ supabase.auth.getSession().then(({ data, error }) => {
 export type UserRole = 'USER' | 'COURSE_ADMIN' | 'SUPERADMIN';
 export type MaterialType = 'video' | 'image' | 'file';
 export type ContentType = 'video' | 'image' | 'text' | 'quiz' | 'file';
+export type CourseType = 'free' | 'paid';
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'cancelled';
 
 export interface Profile {
   id: string;
@@ -72,12 +74,28 @@ export interface Course {
   title: string;
   description?: string;
   is_public: boolean;
+  course_type: CourseType;
+  price?: number;
+  currency?: string;
   created_by: string;
   created_at: string;
   updated_at: string;
   certificate_template_url?: string;
   certificate_settings?: CertificateSettings;
   background_image_url?: string;
+}
+
+export interface Payment {
+  id: string;
+  user_id: string;
+  course_id: string;
+  amount: number;
+  currency: string;
+  payment_intent_id: string;
+  status: PaymentStatus;
+  created_at: string;
+  completed_at?: string;
+  error_message?: string;
 }
 
 export interface CertificateSettings {

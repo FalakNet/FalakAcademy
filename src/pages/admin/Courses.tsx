@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase, Course, Profile } from '../../lib/supabase';
-import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle, Upload, Image } from 'lucide-react';
+import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle, Upload, Image, Crown, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CertificateTemplateManager from '../../components/CertificateTemplateManager';
 import ConfirmModal from '../../components/ConfirmModal';
 import AlertModal from '../../components/AlertModal';
+import { getSupportedCurrencies, formatCurrency, convertToPaymentAmount } from '../../lib/ziina';
 
 export default function AdminCourses() {
   const { profile, isAdmin } = useAuth();
@@ -21,7 +22,10 @@ export default function AdminCourses() {
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
-    is_public: true
+    is_public: true,
+    course_type: 'free' as 'free' | 'paid',
+    price: '',
+    currency: 'AED'
   });
 
   // Modal states
@@ -52,6 +56,8 @@ export default function AdminCourses() {
     message: '',
     type: 'info'
   });
+
+  const supportedCurrencies = getSupportedCurrencies();
 
   useEffect(() => {
     if (isAdmin()) {
@@ -115,18 +121,44 @@ export default function AdminCourses() {
 
   const createCourse = async () => {
     try {
+      const courseData: any = {
+        title: newCourse.title,
+        description: newCourse.description,
+        is_public: newCourse.is_public,
+        course_type: newCourse.course_type,
+        created_by: profile?.id
+      };
+
+      // Add price and currency for paid courses
+      if (newCourse.course_type === 'paid') {
+        if (!newCourse.price || parseFloat(newCourse.price) <= 0) {
+          showAlert('Validation Error', 'Please enter a valid price for paid courses.', 'warning');
+          return;
+        }
+        
+        const displayPrice = parseFloat(newCourse.price);
+        const paymentAmount = convertToPaymentAmount(displayPrice, newCourse.currency);
+        
+        courseData.price = paymentAmount;
+        courseData.currency = newCourse.currency;
+      }
+
       const { error } = await supabase
         .from('courses')
-        .insert({
-          ...newCourse,
-          created_by: profile?.id
-        });
+        .insert(courseData);
 
       if (error) throw error;
 
       loadCourses();
       setShowCreateModal(false);
-      setNewCourse({ title: '', description: '', is_public: true });
+      setNewCourse({ 
+        title: '', 
+        description: '', 
+        is_public: true, 
+        course_type: 'free',
+        price: '',
+        currency: 'AED'
+      });
       showAlert('Success', 'Course created successfully!', 'success');
     } catch (error) {
       console.error('Error creating course:', error);
@@ -138,13 +170,30 @@ export default function AdminCourses() {
     if (!editingCourse) return;
 
     try {
+      const updateData: any = {
+        title: editingCourse.title,
+        description: editingCourse.description,
+        is_public: editingCourse.is_public,
+        course_type: editingCourse.course_type
+      };
+
+      // Handle price and currency for paid courses
+      if (editingCourse.course_type === 'paid') {
+        if (!editingCourse.price || editingCourse.price <= 0) {
+          showAlert('Validation Error', 'Please enter a valid price for paid courses.', 'warning');
+          return;
+        }
+        updateData.price = editingCourse.price;
+        updateData.currency = editingCourse.currency;
+      } else {
+        // Clear price and currency for free courses
+        updateData.price = null;
+        updateData.currency = null;
+      }
+
       const { error } = await supabase
         .from('courses')
-        .update({
-          title: editingCourse.title,
-          description: editingCourse.description,
-          is_public: editingCourse.is_public
-        })
+        .update(updateData)
         .eq('id', editingCourse.id);
 
       if (error) throw error;
@@ -378,6 +427,12 @@ export default function AdminCourses() {
             .delete()
             .eq('course_id', course.id);
 
+          // Delete payments
+          await supabase
+            .from('payments')
+            .delete()
+            .eq('course_id', course.id);
+
           // Delete enrollments
           await supabase
             .from('enrollments')
@@ -486,6 +541,8 @@ export default function AdminCourses() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         {courses.map((course) => {
           const backgroundImageUrl = getBackgroundImageUrl(course);
+          const isPaid = course.course_type === 'paid';
+          const price = course.price && course.currency ? formatCurrency(course.price, course.currency) : null;
           
           return (
             <div key={course.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden flex flex-col h-full">
@@ -541,6 +598,23 @@ export default function AdminCourses() {
                     </button>
                   )}
                 </div>
+
+                {/* Course Type and Price Overlay */}
+                <div className="absolute top-2 left-2 flex items-center space-x-2">
+                  {isPaid && (
+                    <>
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white backdrop-blur-sm flex items-center">
+                        <Crown className="w-3 h-3 mr-1" />
+                        Premium
+                      </span>
+                      {price && (
+                        <span className="px-2 py-1 text-xs font-bold rounded-full bg-white/90 text-gray-900 backdrop-blur-sm">
+                          {price}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="p-4 sm:p-6 flex flex-col flex-1">
@@ -552,6 +626,13 @@ export default function AdminCourses() {
                         : 'bg-orange-100 text-orange-800'
                     }`}>
                       {course.is_public ? 'Public' : 'Private'}
+                    </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      isPaid
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {isPaid ? 'Paid' : 'Free'}
                     </span>
                     {course.certificate_template_url && (
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
@@ -650,7 +731,7 @@ export default function AdminCourses() {
       {/* Create Course Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Create New Course</h3>
               <div className="space-y-4">
@@ -672,6 +753,83 @@ export default function AdminCourses() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+
+                {/* Course Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Course Type</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                      newCourse.course_type === 'free'
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="course_type"
+                        value="free"
+                        checked={newCourse.course_type === 'free'}
+                        onChange={(e) => setNewCourse({ ...newCourse, course_type: e.target.value as 'free' | 'paid' })}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center">
+                        <BookOpen className="w-5 h-5 text-blue-600 mr-2" />
+                        <span className="font-medium">Free</span>
+                      </div>
+                    </label>
+                    
+                    <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                      newCourse.course_type === 'paid'
+                        ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-200'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="course_type"
+                        value="paid"
+                        checked={newCourse.course_type === 'paid'}
+                        onChange={(e) => setNewCourse({ ...newCourse, course_type: e.target.value as 'free' | 'paid' })}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center">
+                        <Crown className="w-5 h-5 text-yellow-600 mr-2" />
+                        <span className="font-medium">Premium</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Price and Currency for Paid Courses */}
+                {newCourse.course_type === 'paid' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={newCourse.price}
+                        onChange={(e) => setNewCourse({ ...newCourse, price: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                      <select
+                        value={newCourse.currency}
+                        onChange={(e) => setNewCourse({ ...newCourse, currency: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {supportedCurrencies.map(currency => (
+                          <option key={currency.code} value={currency.code}>
+                            {currency.code} - {currency.symbol}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -681,15 +839,31 @@ export default function AdminCourses() {
                     className="mr-2"
                   />
                   <label htmlFor="is_public" className="text-sm text-gray-700">
-                    Make this course public (students can self-enroll)
+                    Make this course public (students can see and enroll)
                   </label>
                 </div>
+                
                 {!newCourse.is_public && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                     <p className="text-sm text-orange-800">
                       <strong>Private Course:</strong> Only administrators can enroll students. 
                       Students cannot see or enroll in this course themselves.
                     </p>
+                  </div>
+                )}
+
+                {newCourse.course_type === 'paid' && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <CreditCard className="w-4 h-4 text-yellow-600 mt-0.5 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800">Premium Course</p>
+                        <p className="text-sm text-yellow-600 mt-1">
+                          Students will need to purchase this course before accessing the content. 
+                          Payments are processed securely through Ziina.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -715,7 +889,7 @@ export default function AdminCourses() {
       {/* Edit Course Modal */}
       {editingCourse && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <h3 className="text-lg font-semibold mb-4">Edit Course</h3>
               <div className="space-y-4">
@@ -737,6 +911,87 @@ export default function AdminCourses() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+
+                {/* Course Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Course Type</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                      editingCourse.course_type === 'free'
+                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="edit_course_type"
+                        value="free"
+                        checked={editingCourse.course_type === 'free'}
+                        onChange={(e) => setEditingCourse({ ...editingCourse, course_type: e.target.value as 'free' | 'paid' })}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center">
+                        <BookOpen className="w-5 h-5 text-blue-600 mr-2" />
+                        <span className="font-medium">Free</span>
+                      </div>
+                    </label>
+                    
+                    <label className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                      editingCourse.course_type === 'paid'
+                        ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-200'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="edit_course_type"
+                        value="paid"
+                        checked={editingCourse.course_type === 'paid'}
+                        onChange={(e) => setEditingCourse({ ...editingCourse, course_type: e.target.value as 'free' | 'paid' })}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center">
+                        <Crown className="w-5 h-5 text-yellow-600 mr-2" />
+                        <span className="font-medium">Premium</span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Price and Currency for Paid Courses */}
+                {editingCourse.course_type === 'paid' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingCourse.price ? (editingCourse.price / (editingCourse.currency && ['BHD', 'KWD', 'OMR'].includes(editingCourse.currency) ? 1000 : 100)) : ''}
+                        onChange={(e) => {
+                          const displayPrice = parseFloat(e.target.value) || 0;
+                          const paymentAmount = convertToPaymentAmount(displayPrice, editingCourse.currency || 'AED');
+                          setEditingCourse({ ...editingCourse, price: paymentAmount });
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                      <select
+                        value={editingCourse.currency || 'AED'}
+                        onChange={(e) => setEditingCourse({ ...editingCourse, currency: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        {supportedCurrencies.map(currency => (
+                          <option key={currency.code} value={currency.code}>
+                            {currency.code} - {currency.symbol}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -746,9 +1001,10 @@ export default function AdminCourses() {
                     className="mr-2"
                   />
                   <label htmlFor="edit_is_public" className="text-sm text-gray-700">
-                    Make this course public (students can self-enroll)
+                    Make this course public (students can see and enroll)
                   </label>
                 </div>
+                
                 {!editingCourse.is_public && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                     <p className="text-sm text-orange-800">
