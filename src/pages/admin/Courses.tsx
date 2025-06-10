@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase, Course, Profile } from '../../lib/supabase';
-import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle, Upload, Image, Crown, CreditCard } from 'lucide-react';
+import { supabase, Course } from '../../lib/supabase';
+import { BookOpen, Plus, Edit2, Trash2, Users, Eye, EyeOff, Settings, UserPlus, Award, X, AlertTriangle, Upload, Image, Crown, CreditCard, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import CertificateTemplateManager from '../../components/CertificateTemplateManager';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -25,7 +25,8 @@ export default function AdminCourses() {
     is_public: true,
     course_type: 'free' as 'free' | 'paid',
     price: '',
-    currency: 'AED'
+    currency: 'AED',
+    enable_certificates: true
   });
 
   // Modal states
@@ -126,6 +127,7 @@ export default function AdminCourses() {
         description: newCourse.description,
         is_public: newCourse.is_public,
         course_type: newCourse.course_type,
+        enable_certificates: newCourse.enable_certificates,
         created_by: profile?.id
       };
 
@@ -157,7 +159,8 @@ export default function AdminCourses() {
         is_public: true, 
         course_type: 'free',
         price: '',
-        currency: 'AED'
+        currency: 'AED',
+        enable_certificates: true
       });
       showAlert('Success', 'Course created successfully!', 'success');
     } catch (error) {
@@ -174,7 +177,8 @@ export default function AdminCourses() {
         title: editingCourse.title,
         description: editingCourse.description,
         is_public: editingCourse.is_public,
-        course_type: editingCourse.course_type
+        course_type: editingCourse.course_type,
+        enable_certificates: editingCourse.enable_certificates
       };
 
       // Handle price and currency for paid courses
@@ -634,6 +638,13 @@ export default function AdminCourses() {
                     }`}>
                       {isPaid ? 'Paid' : 'Free'}
                     </span>
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      course.enable_certificates
+                        ? 'bg-purple-100 text-purple-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {course.enable_certificates ? 'Certificates' : 'No Certificates'}
+                    </span>
                     {course.certificate_template_url && (
                       <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
                         Custom Cert
@@ -842,6 +853,19 @@ export default function AdminCourses() {
                     Make this course public (students can see and enroll)
                   </label>
                 </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="enable_certificates"
+                    checked={newCourse.enable_certificates}
+                    onChange={(e) => setNewCourse({ ...newCourse, enable_certificates: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <label htmlFor="enable_certificates" className="text-sm text-gray-700">
+                    Issue certificates upon course completion
+                  </label>
+                </div>
                 
                 {!newCourse.is_public && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
@@ -849,6 +873,21 @@ export default function AdminCourses() {
                       <strong>Private Course:</strong> Only administrators can enroll students. 
                       Students cannot see or enroll in this course themselves.
                     </p>
+                  </div>
+                )}
+
+                {!newCourse.enable_certificates && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <Shield className="w-4 h-4 text-gray-600 mt-0.5 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">No Certificates</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Students will not receive certificates when they complete this course. 
+                          You can enable this later if needed.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -1004,6 +1043,19 @@ export default function AdminCourses() {
                     Make this course public (students can see and enroll)
                   </label>
                 </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="edit_enable_certificates"
+                    checked={editingCourse.enable_certificates}
+                    onChange={(e) => setEditingCourse({ ...editingCourse, enable_certificates: e.target.checked })}
+                    className="mr-2"
+                  />
+                  <label htmlFor="edit_enable_certificates" className="text-sm text-gray-700">
+                    Issue certificates upon course completion
+                  </label>
+                </div>
                 
                 {!editingCourse.is_public && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
@@ -1011,6 +1063,21 @@ export default function AdminCourses() {
                       <strong>Private Course:</strong> Only administrators can enroll students. 
                       Students cannot see or enroll in this course themselves.
                     </p>
+                  </div>
+                )}
+
+                {!editingCourse.enable_certificates && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <div className="flex items-start">
+                      <Shield className="w-4 h-4 text-gray-600 mt-0.5 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">No Certificates</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Students will not receive certificates when they complete this course. 
+                          You can enable this later if needed.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1050,10 +1117,36 @@ export default function AdminCourses() {
                 </button>
               </div>
               
-              <CertificateTemplateManager 
-                course={showCertificateModal}
-                onUpdate={handleCourseUpdate}
-              />
+              {!showCertificateModal.enable_certificates && (
+                <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-start">
+                    <Shield className="w-5 h-5 text-gray-600 mt-0.5 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">Certificates Disabled</p>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Certificates are currently disabled for this course. To enable certificates, 
+                        edit the course settings and check the "Issue certificates upon course completion" option.
+                      </p>
+                      <button
+                        onClick={() => {
+                          setShowCertificateModal(null);
+                          setEditingCourse(showCertificateModal);
+                        }}
+                        className="mt-3 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+                      >
+                        Edit Course Settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {showCertificateModal.enable_certificates && (
+                <CertificateTemplateManager 
+                  course={showCertificateModal}
+                  onUpdate={handleCourseUpdate}
+                />
+              )}
             </div>
           </div>
         </div>

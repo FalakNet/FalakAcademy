@@ -452,8 +452,10 @@ export default function CourseDetail() {
       await loadCourseData();
       setShowCompletionModal(false);
       
-      // Show certificate modal instead of navigating away
-      setShowCertificateModal(true);
+      // Show certificate modal if certificates are enabled for this course
+      if (course?.enable_certificates) {
+        setShowCertificateModal(true);
+      }
       
     } catch (error) {
       console.error('Error completing course:', error);
@@ -1000,7 +1002,8 @@ export default function CourseDetail() {
                   className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg"
                 >
                   <Trophy className="w-4 h-4 mr-2" />
-                  Complete Course & Get Certificate
+                  Complete Course
+                  {course.enable_certificates && " & Get Certificate"}
                 </button>
               )}
 
@@ -1035,7 +1038,7 @@ export default function CourseDetail() {
               })()}
 
               {/* View Certificate Button */}
-              {courseCompletion && certificate && (
+              {courseCompletion && certificate && course.enable_certificates && (
                 <button
                   onClick={() => setShowCertificateModal(true)}
                   className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200"
@@ -1097,23 +1100,40 @@ export default function CourseDetail() {
               </h2>
               
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                You have completed all the content in this course. Are you ready to receive your certificate of completion?
+                You have completed all the content in this course.
+                {course.enable_certificates ? " Are you ready to receive your certificate of completion?" : ""}
               </p>
 
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-                <div className="flex items-start">
-                  <Award className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Certificate Benefits</p>
-                    <ul className="text-sm text-blue-600 dark:text-blue-300 mt-1 space-y-1">
-                      <li>• Official completion certificate</li>
-                      <li>• Downloadable PDF format</li>
-                      <li>• Unique certificate number</li>
-                      <li>• Shareable achievement</li>
-                    </ul>
+              {course.enable_certificates && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <Award className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Certificate Benefits</p>
+                      <ul className="text-sm text-blue-600 dark:text-blue-300 mt-1 space-y-1">
+                        <li>• Official completion certificate</li>
+                        <li>• Downloadable PDF format</li>
+                        <li>• Unique certificate number</li>
+                        <li>• Shareable achievement</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {!course.enable_certificates && (
+                <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400 mt-0.5 mr-2" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">No Certificate Available</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        This course does not issue certificates upon completion. Your progress and completion status will still be recorded.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex space-x-3">
                 <button
@@ -1126,7 +1146,7 @@ export default function CourseDetail() {
                   onClick={completeCourse}
                   className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
                 >
-                  Get My Certificate!
+                  {course.enable_certificates ? "Get My Certificate!" : "Complete Course"}
                 </button>
               </div>
             </div>
@@ -1135,7 +1155,7 @@ export default function CourseDetail() {
       )}
 
       {/* Certificate Modal */}
-      {showCertificateModal && certificate && (
+      {showCertificateModal && certificate && course.enable_certificates && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-6">
