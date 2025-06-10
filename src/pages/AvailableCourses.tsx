@@ -149,16 +149,9 @@ export default function AvailableCourses() {
     setShowPaymentModal(true);
   };
 
-  const handlePaymentInitiated = (paymentIntentId: string, redirectUrl: string) => {
-    // Store payment info in localStorage for verification later
-    localStorage.setItem('pendingPayment', JSON.stringify({
-      paymentIntentId,
-      courseId: paymentCourse?.id,
-      timestamp: Date.now()
-    }));
-
-    // Redirect to Ziina payment page
-    window.location.href = redirectUrl;
+  const handlePaymentSuccess = () => {
+    // Reload courses to update enrollment status
+    loadAvailableCourses();
   };
 
   const showCourseInfo = (course: CourseWithStats) => {
@@ -598,7 +591,7 @@ export default function AvailableCourses() {
             setPaymentCourse(null);
           }}
           course={paymentCourse}
-          onPaymentInitiated={handlePaymentInitiated}
+          onPaymentSuccess={handlePaymentSuccess}
         />
       )}
     </div>
