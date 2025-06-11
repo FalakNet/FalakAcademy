@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { Course } from '../lib/supabase';
 import { createPaymentIntent, formatCurrency, getSupportedCurrencies } from '../lib/ziina';
@@ -18,7 +18,39 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   const [error, setError] = useState<string | null>(null);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
-  const [testMode, setTestMode] = useState(import.meta.env.DEV || false);
+  const [testMode, setTestMode] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+
+  // Load test mode setting from admin settings
+  useEffect(() => {
+    const loadTestModeSetting = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('admin_settings')
+          .select('setting_value')
+          .eq('setting_key', 'test_mode')
+          .single();
+
+        if (error) {
+          console.error('Error loading test mode setting:', error);
+          // Default to test mode if we can't load the setting
+          setTestMode(true);
+        } else {
+          const isTestMode = JSON.parse(data.setting_value) === true;
+          setTestMode(isTestMode);
+        }
+      } catch (error) {
+        console.error('Error parsing test mode setting:', error);
+        setTestMode(true);
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+
+    if (isOpen) {
+      loadTestModeSetting();
+    }
+  }, [isOpen]);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
@@ -144,34 +176,39 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
           </div>
         </div>
 
-        {/* Test Mode Toggle */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="test_mode"
-                type="checkbox"
-                checked={testMode}
-                onChange={(e) => setTestMode(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="test_mode" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                Test Mode {testMode ? '(On)' : '(Off)'}
-              </label>
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {testMode ? 'No real charges will be made' : 'Real payment will be processed'}
-            </div>
-          </div>
-          
-          {testMode && (
-            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Test Card:</strong> Use card number 4242 4242 4242 4242, any future expiry date, and any CVV.
+        {/* Test Mode Indicator */}
+        {!loadingSettings && (
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className={`p-3 rounded-lg border ${
+              testMode 
+                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            }`}>
+              <div className="flex items-center">
+                <div className={`w-2 h-2 rounded-full mr-2 ${
+                  testMode ? 'bg-blue-500' : 'bg-green-500'
+                }`}></div>
+                <span className={`text-sm font-medium ${
+                  testMode 
+                    ? 'text-blue-800 dark:text-blue-200' 
+                    : 'text-green-800 dark:text-green-200'
+                }`}>
+                  {testMode ? 'Test Mode Active' : 'Live Payment Mode'}
+                </span>
+              </div>
+              <p className={`text-xs mt-1 ${
+                testMode 
+                  ? 'text-blue-600 dark:text-blue-300' 
+                  : 'text-green-600 dark:text-green-300'
+              }`}>
+                {testMode 
+                  ? 'No real charges will be made. Use test card: 4242 4242 4242 4242'
+                  : 'Real payment will be processed using your payment method'
+                }
               </p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Security Features */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
@@ -239,13 +276,18 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
           {!paymentLink ? (
             <button
               onClick={handleCreatePayment}
-              disabled={processing}
+              disabled={processing || loadingSettings}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
             >
               {processing ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                   Creating Payment Link...
+                </>
+              ) : loadingSettings ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Loading Settings...
                 </>
               ) : (
                 <>
@@ -270,7 +312,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             </div>
           )}
           
-          {!paymentLink && (
+          {!paymentLink && !loadingSettings && (
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3">
               We'll create a secure payment link that opens in a new tab to avoid popup blockers
             </p>
