@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { Course } from '../lib/supabase';
-import { createPaymentIntent, verifyPaymentStatus, formatCurrency, getSupportedCurrencies } from '../lib/ziina';
+import { createPaymentIntent, formatCurrency, getSupportedCurrencies, verifyPaymentStatus } from '../lib/ziina';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
@@ -19,7 +19,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   const [monitoring, setMonitoring] = useState(false);
   const [paymentTab, setPaymentTab] = useState<Window | null>(null);
   const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
-  const [currentPaymentId, setCurrentPaymentId] = useState<string | null>(null);
+  const [testMode, setTestMode] = useState(import.meta.env.DEV || false);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
@@ -35,13 +35,15 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
     try {
       const baseUrl = window.location.origin;
       
+      console.log('Creating payment with test mode:', testMode);
+      
       // Create payment intent with Ziina
       const paymentIntent = await createPaymentIntent({
         amount: course.price,
         currency: course.currency,
         success_url: `${baseUrl}/payment/success?course_id=${course.id}&payment_id={PAYMENT_INTENT_ID}`,
         cancel_url: `${baseUrl}/payment/cancel?course_id=${course.id}&payment_id={PAYMENT_INTENT_ID}`,
-        test: import.meta.env.DEV,
+        test: testMode, // Use the testMode state
       });
 
       // Create payment record in our database
@@ -59,9 +61,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
       if (paymentError) {
         console.error('Error creating payment record:', paymentError);
       }
-
-      // Store payment ID for monitoring
-      setCurrentPaymentId(paymentIntent.id);
 
       // Open payment page in new tab
       const newTab = window.open(paymentIntent.redirect_url, '_blank');
@@ -93,7 +92,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
 
         // Check payment status directly with Ziina
         const paymentStatus = await verifyPaymentStatus(paymentIntentId);
-
+        
         if (paymentStatus.status === 'completed') {
           // Payment successful - enroll user and close tab
           await handlePaymentSuccess(tab, paymentStatus);
@@ -171,7 +170,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
     }
     setMonitoring(false);
     setPaymentTab(null);
-    setCurrentPaymentId(null);
   };
 
   const handleClose = () => {
@@ -238,6 +236,35 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Test Mode Toggle */}
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <input
+                id="test_mode"
+                type="checkbox"
+                checked={testMode}
+                onChange={(e) => setTestMode(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="test_mode" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+                Test Mode {testMode ? '(On)' : '(Off)'}
+              </label>
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">
+              {testMode ? 'No real charges will be made' : 'Real payment will be processed'}
+            </div>
+          </div>
+          
+          {testMode && (
+            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-xs text-blue-800 dark:text-blue-200">
+                <strong>Test Card:</strong> Use card number 4242 4242 4242 4242, any future expiry date, and any CVV.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Security Features */}
