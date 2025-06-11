@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { Course } from '../lib/supabase';
-import { createPaymentIntent, formatCurrency, getSupportedCurrencies } from '../lib/ziina';
+import { createPaymentIntent, formatCurrency, getSupportedCurrencies, verifyPaymentStatus } from '../lib/ziina';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
@@ -20,6 +20,9 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [testMode, setTestMode] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
+  const [monitoring, setMonitoring] = useState(false);
+  const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
+  const [paymentTab, setPaymentTab] = useState<Window | null>(null);
 
   // Load test mode setting from admin settings
   useEffect(() => {
@@ -51,6 +54,15 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
       loadTestModeSetting();
     }
   }, [isOpen]);
+
+  // Clean up monitoring when component unmounts
+  useEffect(() => {
+    return () => {
+      if (monitoringInterval) {
+        clearInterval(monitoringInterval);
+      }
+    };
+  }, [monitoringInterval]);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
@@ -107,11 +119,158 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
 
   const handleOpenPayment = () => {
     if (paymentLink) {
-      window.open(paymentLink, '_blank', 'noopener,noreferrer');
+      // Open payment in new tab
+      const newTab = window.open(paymentLink, '_blank', 'noopener,noreferrer');
+      setPaymentTab(newTab);
+      
+      // Start monitoring payment status
+      if (paymentIntentId) {
+        setMonitoring(true);
+        startPaymentMonitoring(paymentIntentId);
+      }
     }
   };
 
+  const startPaymentMonitoring = (paymentIntentId: string) => {
+    // Check payment status every 3 seconds
+    const interval = setInterval(async () => {
+      try {
+        // Check if tab is closed
+        if (paymentTab && paymentTab.closed) {
+          console.log('Payment tab closed, checking final status');
+          await checkPaymentStatus(paymentIntentId);
+          stopMonitoring();
+          return;
+        }
+
+        // Check payment status in our database
+        const { data: payment, error } = await supabase
+          .from('payments')
+          .select('status')
+          .eq('payment_intent_id', paymentIntentId)
+          .single();
+
+        if (error) {
+          console.error('Error checking payment status:', error);
+          return;
+        }
+
+        if (payment?.status === 'completed') {
+          // Payment successful - enroll user and close tab
+          await handlePaymentSuccess(paymentIntentId);
+          stopMonitoring();
+        } else if (payment?.status === 'failed' || payment?.status === 'cancelled') {
+          // Payment failed - close tab and show error
+          if (paymentTab && !paymentTab.closed) {
+            paymentTab.close();
+          }
+          setError('Payment was not completed. Please try again.');
+          stopMonitoring();
+        }
+      } catch (error) {
+        console.error('Error monitoring payment:', error);
+      }
+    }, 3000); // Check every 3 seconds
+
+    setMonitoringInterval(interval);
+
+    // Stop monitoring after 10 minutes
+    setTimeout(() => {
+      if (interval) {
+        stopMonitoring();
+        if (paymentTab && !paymentTab.closed) {
+          paymentTab.close();
+        }
+        setError('Payment monitoring timed out. Please check your payment status.');
+      }
+    }, 10 * 60 * 1000);
+  };
+
+  const checkPaymentStatus = async (paymentIntentId: string) => {
+    try {
+      // First check our database
+      const { data: payment, error } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('payment_intent_id', paymentIntentId)
+        .single();
+
+      if (!error && payment?.status === 'completed') {
+        await handlePaymentSuccess(paymentIntentId);
+        return true;
+      }
+
+      // If not completed in our database, check with Ziina
+      const paymentIntent = await verifyPaymentStatus(paymentIntentId);
+      
+      if (paymentIntent.status === 'completed') {
+        // Update our database
+        await supabase
+          .from('payments')
+          .update({
+            status: 'completed',
+            completed_at: new Date().toISOString()
+          })
+          .eq('payment_intent_id', paymentIntentId);
+        
+        // Enroll user
+        await handlePaymentSuccess(paymentIntentId);
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking payment status:', error);
+      return false;
+    }
+  };
+
+  const handlePaymentSuccess = async (paymentIntentId: string) => {
+    try {
+      // Enroll user in the course
+      const { error: enrollmentError } = await supabase
+        .from('enrollments')
+        .insert({
+          user_id: profile!.id,
+          course_id: course.id
+        });
+
+      if (enrollmentError && !enrollmentError.message.includes('duplicate')) {
+        console.error('Error enrolling user:', enrollmentError);
+        setError('Payment successful but enrollment failed. Please contact support.');
+        return;
+      }
+
+      // Close the payment tab
+      if (paymentTab && !paymentTab.closed) {
+        paymentTab.close();
+      }
+      
+      // Call success callback
+      onPaymentSuccess();
+      
+      // Close this modal
+      onClose();
+      
+    } catch (error) {
+      console.error('Error handling payment success:', error);
+      setError('Payment successful but enrollment failed. Please contact support.');
+    }
+  };
+
+  const stopMonitoring = () => {
+    if (monitoringInterval) {
+      clearInterval(monitoringInterval);
+      setMonitoringInterval(null);
+    }
+    setMonitoring(false);
+  };
+
   const handleClose = () => {
+    if (paymentTab && !paymentTab.closed) {
+      paymentTab.close();
+    }
+    stopMonitoring();
     setPaymentLink(null);
     setPaymentIntentId(null);
     setError(null);
@@ -244,8 +403,27 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
           </div>
         )}
 
+        {/* Payment Monitoring Status */}
+        {monitoring && (
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400 mr-3"></div>
+                <div>
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Monitoring Payment Status
+                  </p>
+                  <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">
+                    Complete your payment in the new tab. We'll automatically enroll you once payment is confirmed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Payment Link Ready */}
-        {paymentLink && (
+        {paymentLink && !monitoring && (
           <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <div className="flex items-start">
@@ -296,6 +474,20 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
                 </>
               )}
             </button>
+          ) : monitoring ? (
+            <div className="space-y-3">
+              <button
+                onClick={handleOpenPayment}
+                className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 transition-all duration-200 flex items-center justify-center"
+              >
+                <ExternalLink className="w-5 h-5 mr-2" />
+                Reopen Payment Page
+              </button>
+              
+              <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                Keep this window open while completing your payment
+              </p>
+            </div>
           ) : (
             <div className="space-y-3">
               <button
