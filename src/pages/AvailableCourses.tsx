@@ -455,20 +455,20 @@ export default function AvailableCourses() {
               </div>
 
               {/* Course Stats Grid */}
-              <div className="grid grid-cols-3 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-l md:text-xl lg:text-2xl font-bold text-blue-600">{selectedCourse.sectionCount || 0}</div>
-                  <div className="text-sx md:text-sm text-blue-800">Sections</div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{selectedCourse.sectionCount || 0}</div>
+                  <div className="text-sm text-gray-600">Sections</div>
                 </div>
-                <div className="bg-green-50 rounded-lg p-4 text-center">
-                  <div className="text-l md:text-xl lg:text-2xl font-bold text-green-600">{selectedCourse.contentCount || 0}</div>
-                  <div className="text-sx md:text-sm text-green-800">Lessons</div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{selectedCourse.contentCount || 0}</div>
+                  <div className="text-sm text-gray-600">Lessons</div>
                 </div>
-                <div className="bg-orange-50 rounded-lg p-4 text-center">
-                  <div className="text-l lg:text-2xl md:text-xl font-bold text-orange-600">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-gray-600">
                     {selectedCourse.course_type === 'paid' ? 'Premium' : 'Free'}
                   </div>
-                  <div className="text-sx md:text-sm text-orange-800">Access</div>
+                  <div className="text-sm text-gray-600">Access</div>
                 </div>
               </div>
 
