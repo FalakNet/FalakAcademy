@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePlatformSettings } from '../hooks/usePlatformSettings';
-import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Users, Award } from 'lucide-react';
+import { Eye, EyeOff, ArrowRight, Shield, Users, Award } from 'lucide-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -64,7 +64,19 @@ export default function Login() {
                 />
               ) : (
                 <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4">
-                  <BookOpen className="w-6 h-6 text-white" />
+                  <svg width="32" height="32" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clipPath="url(#clip0_527_160)">
+                      <path d="M50 0H22.4756V11.3524H50V0Z" fill="white"/>
+                      <path d="M11.4446 0.488987L22.3685 11.4596V26.6248L11.4791 15.6888L11.4446 0.488987Z" fill="white"/>
+                      <path d="M0 5.22794L11.273 15.4953V27.4973L0.204714 16.3816L0 5.22794Z" fill="white"/>
+                      <path d="M22.1967 50H11.2729V27.4974H49.5V38.7478H22.1967V50Z" fill="white"/>
+                    </g>
+                    <defs>
+                      <clipPath id="clip0_527_160">
+                        <rect width="50" height="50" fill="white"/>
+                      </clipPath>
+                    </defs>
+                  </svg>
                 </div>
               )}
               <div>
@@ -87,7 +99,19 @@ export default function Login() {
             <div className="space-y-6">
               <div className="flex items-start space-x-4">
                 <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-6 h-6 text-white" />
+                  <svg width="24" height="24" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clipPath="url(#clip0_527_160)">
+                      <path d="M50 0H22.4756V11.3524H50V0Z" fill="white"/>
+                      <path d="M11.4446 0.488987L22.3685 11.4596V26.6248L11.4791 15.6888L11.4446 0.488987Z" fill="white"/>
+                      <path d="M0 5.22794L11.273 15.4953V27.4973L0.204714 16.3816L0 5.22794Z" fill="white"/>
+                      <path d="M22.1967 50H11.2729V27.4974H49.5V38.7478H22.1967V50Z" fill="white"/>
+                    </g>
+                    <defs>
+                      <clipPath id="clip0_527_160">
+                        <rect width="50" height="50" fill="white"/>
+                      </clipPath>
+                    </defs>
+                  </svg>
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg mb-1">Interactive Courses</h3>
@@ -151,7 +175,19 @@ export default function Login() {
                 />
               ) : (
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mr-3">
-                  <BookOpen className="w-6 h-6 text-white" />
+                  <svg width="24" height="24" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g clipPath="url(#clip0_527_160)">
+                      <path d="M50 0H22.4756V11.3524H50V0Z" fill="white"/>
+                      <path d="M11.4446 0.488987L22.3685 11.4596V26.6248L11.4791 15.6888L11.4446 0.488987Z" fill="white"/>
+                      <path d="M0 5.22794L11.273 15.4953V27.4973L0.204714 16.3816L0 5.22794Z" fill="white"/>
+                      <path d="M22.1967 50H11.2729V27.4974H49.5V38.7478H22.1967V50Z" fill="white"/>
+                    </g>
+                    <defs>
+                      <clipPath id="clip0_527_160">
+                        <rect width="50" height="50" fill="white"/>
+                      </clipPath>
+                    </defs>
+                  </svg>
                 </div>
               )}
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{settings.site_name}</h1>
