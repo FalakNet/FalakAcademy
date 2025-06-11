@@ -132,8 +132,8 @@ export default function CourseEnrollments() {
     }
   };
 
-  const handleUnenrollUser = async (enrollmentId: string) => {
-    if (!confirm('Are you sure you want to remove this student from the course?')) {
+  const handleUnenrollUser = async (enrollmentId: string, userName: string) => {
+    if (!confirm(`Are you sure you want to remove "${userName}" from this course? This action cannot be undone.`)) {
       return;
     }
 
@@ -237,15 +237,13 @@ export default function CourseEnrollments() {
           </div>
         </div>
         
-        {!course.is_public && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Add Students
-          </button>
-        )}
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <UserPlus className="w-4 h-4 mr-2" />
+          Add Students
+        </button>
       </div>
 
       {/* Course Info */}
@@ -277,7 +275,7 @@ export default function CourseEnrollments() {
               <p className="text-sm font-medium text-blue-800">Public Course</p>
               <p className="text-sm text-blue-600 mt-1">
                 This is a public course. Students can enroll themselves from the "Available Courses" page. 
-                You can view current enrollments below, but manual enrollment management is only available for private courses.
+                You can manually add or remove students as needed for administrative purposes.
               </p>
             </div>
           </div>
@@ -367,15 +365,13 @@ export default function CourseEnrollments() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {!course.is_public && (
-                      <button
-                        onClick={() => handleUnenrollUser(enrollment.id)}
-                        className="text-red-600 hover:text-red-900"
-                        title="Remove from course"
-                      >
-                        <UserMinus className="w-4 h-4" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleUnenrollUser(enrollment.id, enrollment.profiles.name)}
+                      className="text-red-600 hover:text-red-900"
+                      title="Remove from course"
+                    >
+                      <UserMinus className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -389,7 +385,7 @@ export default function CourseEnrollments() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No students enrolled</h3>
             <p className="text-gray-600">
               {course.is_public 
-                ? 'Students can enroll themselves from the Available Courses page.'
+                ? 'Students can enroll themselves from the Available Courses page, or you can manually add them using the "Add Students" button above.'
                 : 'Add students to this private course using the "Add Students" button above.'
               }
             </p>
@@ -398,7 +394,7 @@ export default function CourseEnrollments() {
       </div>
 
       {/* Add Students Modal */}
-      {showAddModal && !course.is_public && (
+      {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
