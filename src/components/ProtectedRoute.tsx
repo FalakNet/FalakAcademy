@@ -34,7 +34,7 @@ export default function ProtectedRoute({
 
   // Check if admin trying to access user-only pages
   if (userOnly && (isAdmin() || isSuperAdmin())) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/dashboard\" replace />;
   }
 
   // Check if user trying to access admin-only pages
@@ -49,7 +49,7 @@ export default function ProtectedRoute({
     const requiredLevel = roleHierarchy[requiredRole];
     
     if (userLevel < requiredLevel) {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/dashboard\" replace />;
     }
   }
 
