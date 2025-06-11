@@ -34,8 +34,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
     try {
       const baseUrl = window.location.origin;
       
-      console.log('Creating payment in test mode (hardcoded)');
-      
       // Create payment intent with Ziina (always in test mode)
       const paymentIntent = await createPaymentIntent({
         amount: course.price,
@@ -236,21 +234,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
           </div>
         </div>
 
-        {/* Test Mode Notice */}
-        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <div className="flex items-start">
-              <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
-              <div>
-                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Test Mode Active</p>
-                <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">
-                  This is a test payment. No real charges will be made. Use test card: 4242 4242 4242 4242
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Security Features */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="grid grid-cols-2 gap-4">
@@ -292,7 +275,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
               <div className="flex items-center">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
                 <p className="text-sm text-blue-800 dark:text-blue-200">
-                  Monitoring payment status... Complete your payment in the new tab.
+                  Processing payment... Complete your payment in the new tab.
                 </p>
               </div>
             </div>
@@ -314,12 +297,12 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             ) : monitoring ? (
               <>
                 <div className="animate-pulse w-5 h-5 bg-white rounded-full mr-2"></div>
-                Monitoring Payment...
+                Processing Payment...
               </>
             ) : (
               <>
                 <CreditCard className="w-5 h-5 mr-2" />
-                Pay {formattedPrice} (Test)
+                Pay {formattedPrice}
               </>
             )}
           </button>

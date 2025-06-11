@@ -4,7 +4,6 @@ export interface CreatePaymentParams {
   currency: string;
   success_url: string;
   cancel_url: string;
-  test?: boolean;
 }
 
 export interface PaymentIntentResponse {
@@ -137,8 +136,6 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       transaction_source: 'directApi' as const,
       operation_id: generateOperationId(),
     };
-
-    console.log('Creating payment with test mode: true (hardcoded)');
 
     const response = await fetch(apiUrl, {
       method: 'POST',
