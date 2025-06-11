@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
 import { Course } from '../lib/supabase';
 import { createPaymentIntent, formatCurrency, getSupportedCurrencies, verifyPaymentStatus } from '../lib/ziina';
 import { supabase } from '../lib/supabase';
@@ -16,13 +16,14 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   const { profile } = useAuth();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [monitoring, setMonitoring] = useState(false);
-  const [paymentTab, setPaymentTab] = useState<Window | null>(null);
   const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
-  const handlePayment = async () => {
+  const createPayment = async () => {
     if (!profile) {
       setError('You must be logged in to make a purchase');
       return;
@@ -58,16 +59,9 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
         console.error('Error creating payment record:', paymentError);
       }
 
-      // Open payment page in new tab
-      const newTab = window.open(paymentIntent.redirect_url, '_blank');
-      setPaymentTab(newTab);
-      
-      if (newTab) {
-        setMonitoring(true);
-        startPaymentMonitoring(paymentIntent.id, newTab);
-      } else {
-        throw new Error('Failed to open payment window. Please allow popups for this site.');
-      }
+      // Set the payment URL and ID for the button
+      setPaymentUrl(paymentIntent.redirect_url);
+      setPaymentIntentId(paymentIntent.id);
 
     } catch (error) {
       console.error('Payment creation failed:', error);
@@ -77,7 +71,21 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
     }
   };
 
-  const startPaymentMonitoring = (paymentIntentId: string, tab: Window) => {
+  const openPaymentPage = () => {
+    if (!paymentUrl || !paymentIntentId) return;
+
+    // Open payment page in new tab
+    const newTab = window.open(paymentUrl, '_blank');
+    
+    if (newTab) {
+      setMonitoring(true);
+      startPaymentMonitoring(paymentIntentId, newTab);
+    } else {
+      setError('Failed to open payment window. Please allow popups for this site.');
+    }
+  };
+
+  const startPaymentMonitoring = (paymentId: string, tab: Window) => {
     const interval = setInterval(async () => {
       try {
         // Check if tab is closed
@@ -87,7 +95,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
         }
 
         // Check payment status directly with Ziina
-        const paymentStatus = await verifyPaymentStatus(paymentIntentId);
+        const paymentStatus = await verifyPaymentStatus(paymentId);
         
         if (paymentStatus.status === 'completed') {
           // Payment successful - enroll user and close tab
@@ -165,13 +173,9 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
       setMonitoringInterval(null);
     }
     setMonitoring(false);
-    setPaymentTab(null);
   };
 
   const handleClose = () => {
-    if (paymentTab && !paymentTab.closed) {
-      paymentTab.close();
-    }
     stopMonitoring();
     onClose();
   };
@@ -284,31 +288,49 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
 
         {/* Payment Button */}
         <div className="p-6">
-          <button
-            onClick={handlePayment}
-            disabled={processing || monitoring}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
-          >
-            {processing ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Creating Payment...
-              </>
-            ) : monitoring ? (
-              <>
-                <div className="animate-pulse w-5 h-5 bg-white rounded-full mr-2"></div>
-                Processing Payment...
-              </>
-            ) : (
-              <>
-                <CreditCard className="w-5 h-5 mr-2" />
-                Pay {formattedPrice}
-              </>
-            )}
-          </button>
+          {!paymentUrl ? (
+            <button
+              onClick={createPayment}
+              disabled={processing}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
+            >
+              {processing ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Creating Payment...
+                </>
+              ) : (
+                <>
+                  <CreditCard className="w-5 h-5 mr-2" />
+                  Create Payment
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={openPaymentPage}
+              disabled={monitoring}
+              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center"
+            >
+              {monitoring ? (
+                <>
+                  <div className="animate-pulse w-5 h-5 bg-white rounded-full mr-2"></div>
+                  Processing Payment...
+                </>
+              ) : (
+                <>
+                  <ExternalLink className="w-5 h-5 mr-2" />
+                  Pay {formattedPrice}
+                </>
+              )}
+            </button>
+          )}
           
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3">
-            Payment will open in a new tab. Keep this window open to complete enrollment.
+            {!paymentUrl 
+              ? "Click to create your secure payment link"
+              : "Payment will open in a new tab. Keep this window open to complete enrollment."
+            }
           </p>
         </div>
       </div>
