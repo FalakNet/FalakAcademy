@@ -3,6 +3,8 @@ import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePlatformSettings } from '../hooks/usePlatformSettings';
 import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Users, Award } from 'lucide-react';
+import TermsOfService from '../components/TermsOfService';
+import PrivacyPolicy from '../components/PrivacyPolicy';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -10,6 +12,8 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   
   const { user, signIn } = useAuth();
   const { settings, getAssetUrl } = usePlatformSettings();
@@ -267,33 +271,35 @@ export default function Login() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
               {settings.footer_text}
             </p>
-            {(settings.terms_url || settings.privacy_url) && (
-              <div className="flex justify-center space-x-6">
-                {settings.terms_url && (
-                  <a 
-                    href={settings.terms_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline transition-colors"
-                  >
-                    Terms of Service
-                  </a>
-                )}
-                {settings.privacy_url && (
-                  <a 
-                    href={settings.privacy_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline transition-colors"
-                  >
-                    Privacy Policy
-                  </a>
-                )}
-              </div>
-            )}
+            <div className="flex justify-center space-x-6">
+              <button
+                onClick={() => setShowTermsModal(true)}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline transition-colors"
+              >
+                Terms of Service
+              </button>
+              <button
+                onClick={() => setShowPrivacyModal(true)}
+                className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 underline transition-colors"
+              >
+                Privacy Policy
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Terms of Service Modal */}
+      <TermsOfService 
+        isOpen={showTermsModal} 
+        onClose={() => setShowTermsModal(false)} 
+      />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicy 
+        isOpen={showPrivacyModal} 
+        onClose={() => setShowPrivacyModal(false)} 
+      />
     </div>
   );
 }
