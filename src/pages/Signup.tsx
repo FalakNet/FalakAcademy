@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePlatformSettings } from '../hooks/usePlatformSettings';
-import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Users, Award, CheckCircle } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Users, Award, CheckCircle, AlertCircle } from 'lucide-react';
+import TermsOfService from '../components/TermsOfService';
+import PrivacyPolicy from '../components/PrivacyPolicy';
 
 export default function Signup() {
   const [name, setName] = useState('');
@@ -12,6 +14,11 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [formSubmitted, setFormSubmitted] = useState(false);
   
   const { user, signUp } = useAuth();
   const { settings, getAssetUrl } = usePlatformSettings();
@@ -28,6 +35,13 @@ export default function Signup() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFormSubmitted(true);
+
+    // Validate terms and privacy acceptance
+    if (!termsAccepted || !privacyAccepted) {
+      setError('You must accept the Terms of Service and Privacy Policy to continue');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -42,7 +56,23 @@ export default function Signup() {
     setLoading(true);
 
     try {
+      // Store acceptance timestamp in user metadata
+      const acceptanceTimestamp = new Date().toISOString();
+      
       await signUp(email, password, name);
+      
+      // Note: In a production environment, you would also want to store the acceptance
+      // in your database, possibly in a separate table that logs user consent
+      
+      // Example of how you might store this if you had direct database access:
+      // await supabase.from('user_consents').insert({
+      //   user_id: user.id,
+      //   terms_accepted_at: acceptanceTimestamp,
+      //   privacy_accepted_at: acceptanceTimestamp,
+      //   terms_version: '1.0',
+      //   privacy_version: '1.0'
+      // });
+      
     } catch (error: any) {
       setError(error.message || 'Failed to create account');
     } finally {
@@ -298,6 +328,87 @@ export default function Signup() {
                 </div>
               )}
 
+              {/* Terms and Privacy Checkboxes */}
+              <div className="space-y-3">
+                <div className={`flex items-start ${formSubmitted && !termsAccepted ? 'animate-pulse' : ''}`}>
+                  <div className="flex items-center h-5">
+                    <input
+                      id="terms"
+                      name="terms"
+                      type="checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className={`h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded ${
+                        formSubmitted && !termsAccepted 
+                          ? 'border-red-500 ring-2 ring-red-200' 
+                          : ''
+                      }`}
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="terms" className={`font-medium ${
+                      formSubmitted && !termsAccepted 
+                        ? 'text-red-700 dark:text-red-400' 
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}>
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsModal(true)}
+                        className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                      >
+                        Terms of Service
+                      </button>
+                    </label>
+                    {formSubmitted && !termsAccepted && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400 flex items-center">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        You must accept the Terms of Service
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className={`flex items-start ${formSubmitted && !privacyAccepted ? 'animate-pulse' : ''}`}>
+                  <div className="flex items-center h-5">
+                    <input
+                      id="privacy"
+                      name="privacy"
+                      type="checkbox"
+                      checked={privacyAccepted}
+                      onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                      className={`h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded ${
+                        formSubmitted && !privacyAccepted 
+                          ? 'border-red-500 ring-2 ring-red-200' 
+                          : ''
+                      }`}
+                    />
+                  </div>
+                  <div className="ml-3 text-sm">
+                    <label htmlFor="privacy" className={`font-medium ${
+                      formSubmitted && !privacyAccepted 
+                        ? 'text-red-700 dark:text-red-400' 
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}>
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowPrivacyModal(true)}
+                        className="text-blue-600 dark:text-blue-400 underline hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                      >
+                        Privacy Policy
+                      </button>
+                    </label>
+                    {formSubmitted && !privacyAccepted && (
+                      <p className="mt-1 text-xs text-red-600 dark:text-red-400 flex items-center">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        You must accept the Privacy Policy
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
@@ -366,6 +477,18 @@ export default function Signup() {
           </div>
         </div>
       </div>
+
+      {/* Terms of Service Modal */}
+      <TermsOfService 
+        isOpen={showTermsModal} 
+        onClose={() => setShowTermsModal(false)} 
+      />
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicy 
+        isOpen={showPrivacyModal} 
+        onClose={() => setShowPrivacyModal(false)} 
+      />
     </div>
   );
 }
