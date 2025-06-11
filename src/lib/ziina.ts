@@ -133,12 +133,12 @@ export async function createPaymentIntent(params: CreatePaymentParams): Promise<
       currency_code: params.currency.toUpperCase(),
       success_url: params.success_url,
       cancel_url: params.cancel_url,
-      test: params.test === true, // Explicitly check for true
+      test: true, // HARDCODED TO TEST MODE
       transaction_source: 'directApi' as const,
       operation_id: generateOperationId(),
     };
 
-    console.log('Creating payment with test mode:', params.test);
+    console.log('Creating payment with test mode: true (hardcoded)');
 
     const response = await fetch(apiUrl, {
       method: 'POST',

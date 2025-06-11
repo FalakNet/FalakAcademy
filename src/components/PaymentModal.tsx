@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, CreditCard, Shield, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { Course } from '../lib/supabase';
 import { createPaymentIntent, formatCurrency, getSupportedCurrencies, verifyPaymentStatus } from '../lib/ziina';
@@ -19,7 +19,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   const [monitoring, setMonitoring] = useState(false);
   const [paymentTab, setPaymentTab] = useState<Window | null>(null);
   const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
-  const [testMode, setTestMode] = useState(import.meta.env.DEV || false);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
@@ -35,15 +34,14 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
     try {
       const baseUrl = window.location.origin;
       
-      console.log('Creating payment with test mode:', testMode);
+      console.log('Creating payment in test mode (hardcoded)');
       
-      // Create payment intent with Ziina
+      // Create payment intent with Ziina (always in test mode)
       const paymentIntent = await createPaymentIntent({
         amount: course.price,
         currency: course.currency,
         success_url: `${baseUrl}/payment/success?course_id=${course.id}&payment_id={PAYMENT_INTENT_ID}`,
         cancel_url: `${baseUrl}/payment/cancel?course_id=${course.id}&payment_id={PAYMENT_INTENT_ID}`,
-        test: testMode, // Use the testMode state
       });
 
       // Create payment record in our database
@@ -238,33 +236,19 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
           </div>
         </div>
 
-        {/* Test Mode Toggle */}
+        {/* Test Mode Notice */}
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="test_mode"
-                type="checkbox"
-                checked={testMode}
-                onChange={(e) => setTestMode(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="test_mode" className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-                Test Mode {testMode ? '(On)' : '(Off)'}
-              </label>
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">
-              {testMode ? 'No real charges will be made' : 'Real payment will be processed'}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="flex items-start">
+              <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
+              <div>
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Test Mode Active</p>
+                <p className="text-sm text-blue-600 dark:text-blue-300 mt-1">
+                  This is a test payment. No real charges will be made. Use test card: 4242 4242 4242 4242
+                </p>
+              </div>
             </div>
           </div>
-          
-          {testMode && (
-            <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Test Card:</strong> Use card number 4242 4242 4242 4242, any future expiry date, and any CVV.
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Security Features */}
@@ -335,7 +319,7 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             ) : (
               <>
                 <CreditCard className="w-5 h-5 mr-2" />
-                Pay {formattedPrice}
+                Pay {formattedPrice} (Test)
               </>
             )}
           </button>
