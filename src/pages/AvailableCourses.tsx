@@ -260,9 +260,11 @@ export default function AvailableCourses() {
                   {/* Course Status Overlays */}
                   <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100/90 text-green-800 backdrop-blur-sm">
+                      {!isPaid && (
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100/90 text-green-800 backdrop-blur-sm">
                         Public
                       </span>
+                      )}
                       {isPaid && (
                         <span className="px-2 py-1 text-xs font-medium rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 text-white backdrop-blur-sm flex items-center">
                           <Crown className="w-3 h-3 mr-1" />
@@ -270,12 +272,19 @@ export default function AvailableCourses() {
                         </span>
                       )}
                     </div>
-                    
-                    {isPaid && price && (
-                      <span className="px-3 py-1 text-sm font-bold rounded-full bg-white/90 text-gray-900 backdrop-blur-sm">
-                        {price}
-                      </span>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {isPaid && price && (
+                        <span
+                          className={`
+                            px-3 py-1 text-sm font-bold rounded-full
+                            bg-white/90 text-gray-900 backdrop-blur-sm
+                            dark:bg-gray-900/90 dark:text-white
+                          `}
+                        >
+                          {price}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 

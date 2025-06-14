@@ -73,7 +73,7 @@ export default function Certificates() {
                 </div>
                 
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  {certificate.courses.title}
+                  {certificate.courses && certificate.courses.title ? certificate.courses.title : 'Untitled Course'}
                 </h3>
                 
                 <div className="space-y-2 mb-4">

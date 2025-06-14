@@ -16,33 +16,32 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
   const { profile } = useAuth();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [monitoring, setMonitoring] = useState(false);
-  const [monitoringInterval, setMonitoringInterval] = useState<NodeJS.Timeout | null>(null);
 
   if (!isOpen || !course.price || !course.currency) return null;
 
-  const createPayment = async () => {
+  const handlePayment = async () => {
     if (!profile) {
       setError('You must be logged in to make a purchase');
       return;
     }
-
     setProcessing(true);
     setError(null);
-
+    // Open popup synchronously to avoid iOS popup blocking
+    const popup = window.open('', 'ziina_payment', 'width=480,height=700');
+    if (!popup) {
+      setError('Popup blocked. Please allow popups and try again.');
+      setProcessing(false);
+      return;
+    }
     try {
       const baseUrl = window.location.origin;
-      
-      // Create payment intent with Ziina (always in test mode)
       const paymentIntent = await createPaymentIntent({
         amount: course.price,
         currency: course.currency,
         success_url: `${baseUrl}/payment/success?course_id=${course.id}&payment_id={PAYMENT_INTENT_ID}`,
         cancel_url: `${baseUrl}/payment/cancel?course_id=${course.id}&payment_id={PAYMENT_INTENT_ID}`,
       });
-
       // Create payment record in our database
       const { error: paymentError } = await supabase
         .from('payments')
@@ -52,132 +51,50 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
           amount: course.price,
           currency: course.currency,
           payment_intent_id: paymentIntent.id,
-          status: 'pending'
+          status: 'pending',
         });
-
       if (paymentError) {
         console.error('Error creating payment record:', paymentError);
       }
-
-      // Set the payment URL and ID for the button
-      setPaymentUrl(paymentIntent.redirect_url);
-      setPaymentIntentId(paymentIntent.id);
-
+      // Set popup location to payment URL
+      popup.location.href = paymentIntent.redirect_url;
+      setMonitoring(true);
+      const poll = setInterval(async () => {
+        try {
+          const status = await verifyPaymentStatus(paymentIntent.id);
+          if (status.status === 'completed') {
+            await supabase
+              .from('enrollments')
+              .insert({
+                user_id: profile.id,
+                course_id: course.id
+              });
+            clearInterval(poll);
+            popup.close();
+            setMonitoring(false);
+            onPaymentSuccess();
+            onClose();
+          } else if (status.status === 'failed' || status.status === 'canceled') {
+            clearInterval(poll);
+            popup.close();
+            setMonitoring(false);
+            setError('Payment was not completed. Please try again.');
+          }
+        } catch (e) {
+          // ignore network errors, keep polling
+        }
+        if (popup.closed) {
+          clearInterval(poll);
+          setMonitoring(false);
+        }
+      }, 2000);
     } catch (error) {
+      popup.close();
       console.error('Payment creation failed:', error);
       setError(error instanceof Error ? error.message : 'Failed to create payment');
     } finally {
       setProcessing(false);
     }
-  };
-
-  const openPaymentPage = () => {
-    if (!paymentUrl || !paymentIntentId) return;
-
-    // Open payment page in new tab
-    const newTab = window.open(paymentUrl, '_blank');
-    
-    if (newTab) {
-      setMonitoring(true);
-      startPaymentMonitoring(paymentIntentId, newTab);
-    } else {
-      setError('Failed to open payment window. Please allow popups for this site.');
-    }
-  };
-
-  const startPaymentMonitoring = (paymentId: string, tab: Window) => {
-    const interval = setInterval(async () => {
-      try {
-        // Check if tab is closed
-        if (tab.closed) {
-          stopMonitoring();
-          return;
-        }
-
-        // Check payment status directly with Ziina
-        const paymentStatus = await verifyPaymentStatus(paymentId);
-        
-        if (paymentStatus.status === 'completed') {
-          // Payment successful - enroll user and close tab
-          await handlePaymentSuccess(tab, paymentStatus);
-          stopMonitoring();
-        } else if (paymentStatus.status === 'failed' || paymentStatus.status === 'canceled') {
-          // Payment failed - close tab and show error
-          tab.close();
-          setError('Payment was not completed. Please try again.');
-          stopMonitoring();
-        }
-      } catch (error) {
-        console.error('Error monitoring payment:', error);
-        // Continue monitoring - might be a temporary network issue
-      }
-    }, 2000); // Check every 2 seconds
-
-    setMonitoringInterval(interval);
-
-    // Stop monitoring after 10 minutes
-    setTimeout(() => {
-      if (interval) {
-        stopMonitoring();
-        if (!tab.closed) {
-          tab.close();
-        }
-        setError('Payment monitoring timed out. Please check your payment status.');
-      }
-    }, 10 * 60 * 1000);
-  };
-
-  const handlePaymentSuccess = async (tab: Window, paymentStatus: any) => {
-    try {
-      // Update payment record in our database
-      await supabase
-        .from('payments')
-        .update({
-          status: 'completed',
-          completed_at: paymentStatus.completed_at || new Date().toISOString()
-        })
-        .eq('payment_intent_id', paymentStatus.id);
-
-      // Enroll user in the course
-      const { error: enrollmentError } = await supabase
-        .from('enrollments')
-        .insert({
-          user_id: profile!.id,
-          course_id: course.id
-        });
-
-      if (enrollmentError && !enrollmentError.message.includes('duplicate')) {
-        console.error('Error enrolling user:', enrollmentError);
-        setError('Payment successful but enrollment failed. Please contact support.');
-        return;
-      }
-
-      // Close the payment tab
-      tab.close();
-      
-      // Call success callback
-      onPaymentSuccess();
-      
-      // Close this modal
-      onClose();
-      
-    } catch (error) {
-      console.error('Error handling payment success:', error);
-      setError('Payment successful but enrollment failed. Please contact support.');
-    }
-  };
-
-  const stopMonitoring = () => {
-    if (monitoringInterval) {
-      clearInterval(monitoringInterval);
-      setMonitoringInterval(null);
-    }
-    setMonitoring(false);
-  };
-
-  const handleClose = () => {
-    stopMonitoring();
-    onClose();
   };
 
   const currencyInfo = getSupportedCurrencies().find(c => c.code === course.currency);
@@ -189,12 +106,11 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
         {/* Header */}
         <div className="relative p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <button
-            onClick={handleClose}
+            onClick={onClose}
             className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation"
           >
             <X className="w-5 h-5" />
           </button>
-          
           <div className="flex items-center pr-12">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mr-4 flex-shrink-0">
               <CreditCard className="w-6 h-6 text-white" />
@@ -205,7 +121,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             </div>
           </div>
         </div>
-
         {/* Course Info */}
         <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl p-4">
@@ -215,7 +130,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             </p>
           </div>
         </div>
-
         {/* Price Breakdown */}
         <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="space-y-3">
@@ -237,7 +151,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             </div>
           </div>
         </div>
-
         {/* Security Features */}
         <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -259,7 +172,6 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             </div>
           </div>
         </div>
-
         {/* Error Message */}
         {error && (
           <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
@@ -271,66 +183,27 @@ export default function PaymentModal({ isOpen, onClose, course, onPaymentSuccess
             </div>
           </div>
         )}
-
-        {/* Monitoring Status */}
-        {monitoring && (
-          <div className="p-4 sm:p-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-              <div className="flex items-start">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2 mt-0.5 flex-shrink-0"></div>
-                <p className="text-sm text-blue-800 dark:text-blue-200">
-                  Processing payment... Complete your payment in the new tab.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Payment Button */}
         <div className="p-4 sm:p-6">
-          {!paymentUrl ? (
-            <button
-              onClick={createPayment}
-              disabled={processing}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center touch-manipulation min-h-[56px]"
-            >
-              {processing ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  <span className="text-sm sm:text-base">Creating Payment...</span>
-                </>
-              ) : (
-                <>
-                  <CreditCard className="w-5 h-5 mr-2" />
-                  <span className="text-sm sm:text-base">Create Payment</span>
-                </>
-              )}
-            </button>
-          ) : (
-            <button
-              onClick={openPaymentPage}
-              disabled={monitoring}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center touch-manipulation min-h-[56px]"
-            >
-              {monitoring ? (
-                <>
-                  <div className="animate-pulse w-5 h-5 bg-white rounded-full mr-2"></div>
-                  <span className="text-sm sm:text-base">Processing Payment...</span>
-                </>
-              ) : (
-                <>
-                  <ExternalLink className="w-5 h-5 mr-2" />
-                  <span className="text-sm sm:text-base">Pay {formattedPrice}</span>
-                </>
-              )}
-            </button>
-          )}
-          
+          <button
+            onClick={handlePayment}
+            disabled={processing || monitoring}
+            className="w-full bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-6 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center touch-manipulation min-h-[56px]"
+          >
+            {processing || monitoring ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                <span className="text-sm sm:text-base">Processing...</span>
+              </>
+            ) : (
+              <>
+                <ExternalLink className="w-5 h-5 mr-2" />
+                <span className="text-sm sm:text-base">Pay {formattedPrice}</span>
+              </>
+            )}
+          </button>
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-3 leading-relaxed">
-            {!paymentUrl 
-              ? "Click to create your secure payment link"
-              : "Payment will open in a new tab. Keep this window open to complete enrollment."
-            }
+            Payment will open in a popup. Complete your payment to access the course.
           </p>
         </div>
       </div>
