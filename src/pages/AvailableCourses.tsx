@@ -4,6 +4,7 @@ import { supabase, Course } from '../lib/supabase';
 import { BookOpen, Clock, Users, ChevronRight, Check, Info, X, Calendar, Eye, FileText, CreditCard, Crown, Star } from 'lucide-react';
 import { formatCurrency } from '../lib/ziina';
 import PaymentModal from '../components/PaymentModal';
+import AlertModal from '../components/AlertModal';
 
 interface CourseWithStats extends Course {
   enrollmentCount?: number;
@@ -22,6 +23,12 @@ export default function AvailableCourses() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentCourse, setPaymentCourse] = useState<CourseWithStats | null>(null);
   const [filter, setFilter] = useState<'all' | 'free' | 'paid'>('all');
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
 
   useEffect(() => {
     loadAvailableCourses();
@@ -139,7 +146,7 @@ export default function AvailableCourses() {
       ));
     } catch (error) {
       console.error('Error enrolling in course:', error);
-      alert('Failed to enroll in course. Please try again.');
+      showAlert('Error', 'Failed to enroll in course. Please try again.', 'error');
     } finally {
       setEnrollingCourseId(null);
     }
@@ -604,6 +611,15 @@ export default function AvailableCourses() {
           onPaymentSuccess={handlePaymentSuccess}
         />
       )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </div>
   );
 }

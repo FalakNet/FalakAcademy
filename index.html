@@ -5,7 +5,8 @@
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Falak Academy - Learning Management System</title>
-    
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
     <!-- SVG filters for colorblind support -->
     <svg class="colorblind-filters" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -16,7 +17,6 @@
                                                0 0.242 0.758 0 0
                                                0 0 0 1 0"/>
         </filter>
-        
         <!-- Deuteranopia filter (green-blind) -->
         <filter id="deuteranopia-filter">
           <feColorMatrix type="matrix" values="0.625 0.375 0 0 0
@@ -24,7 +24,6 @@
                                                0 0.3 0.7 0 0
                                                0 0 0 1 0"/>
         </filter>
-        
         <!-- Tritanopia filter (blue-blind) -->
         <filter id="tritanopia-filter">
           <feColorMatrix type="matrix" values="0.95 0.05 0 0 0
@@ -38,5 +37,6 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <!-- PWA: Service worker registration will be handled by vite-plugin-pwa -->
   </body>
 </html>

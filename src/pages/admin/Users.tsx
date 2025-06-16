@@ -439,7 +439,10 @@ export default function AdminUsers() {
   // Filter and sort users
   const filteredAndSortedUsers = users
     .filter(user => {
-      const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const lowerSearch = searchTerm.toLowerCase();
+      const matchesSearch =
+        user.name.toLowerCase().includes(lowerSearch) ||
+        user.email.toLowerCase().includes(lowerSearch);
       const matchesRole = roleFilter === 'all' || user.role === roleFilter;
       return matchesSearch && matchesRole;
     })
@@ -487,18 +490,11 @@ export default function AdminUsers() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">User Management</h1>
           <p className="mt-2 text-sm sm:text-base text-gray-600">Manage users and their roles in the system.</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add User
-        </button>
       </div>
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Search Users</label>
             <input
@@ -506,7 +502,7 @@ export default function AdminUsers() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Search by name..."
+              placeholder="Search by name or email"
             />
           </div>
           
@@ -572,7 +568,7 @@ export default function AdminUsers() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredAndSortedUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-gray-50">
+                <tr key={user.id} className="hover:bg-gray-50 border-y border-gray-200">
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center bg-blue-100 flex-shrink-0">
@@ -588,7 +584,7 @@ export default function AdminUsers() {
                           )}
                         </div>
                         <div className="text-xs text-gray-500 font-mono truncate">
-                          {user.id.slice(0, 8)}...
+                          {user.email}
                         </div>
                       </div>
                     </div>

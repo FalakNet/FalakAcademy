@@ -8,6 +8,9 @@ interface AlertModalProps {
   message: string;
   type?: 'success' | 'error' | 'warning' | 'info';
   buttonText?: string;
+  onButtonClick?: () => void; 
+  secondaryButtonText?: string; // Add this line
+  onSecondaryButtonClick?: () => void; // Add this line
 }
 
 export default function AlertModal({
@@ -16,7 +19,10 @@ export default function AlertModal({
   title,
   message,
   type = 'info',
-  buttonText = 'OK'
+  buttonText = 'OK',
+  onButtonClick, // Add this line
+  secondaryButtonText,
+  onSecondaryButtonClick
 }: AlertModalProps) {
   if (!isOpen) return null;
 
@@ -79,9 +85,17 @@ export default function AlertModal({
           </div>
         </div>
         
-        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 rounded-b-lg flex justify-end">
+        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 rounded-b-lg flex justify-end gap-2">
+          {secondaryButtonText && (
+            <button
+              onClick={onSecondaryButtonClick || onClose}
+              className="px-4 py-2 rounded-lg transition-colors bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+            >
+              {secondaryButtonText}
+            </button>
+          )}
           <button
-            onClick={onClose}
+            onClick={onButtonClick || onClose}
             className={`px-4 py-2 text-white rounded-lg transition-colors ${styles.buttonBg}`}
           >
             {buttonText}

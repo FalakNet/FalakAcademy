@@ -6,6 +6,7 @@ import {
   Upload, Image, Palette, Eye, EyeOff, CheckCircle, X, Monitor,
   FileText, Lock, HelpCircle, Trash2, CreditCard
 } from 'lucide-react';
+import AlertModal from '../../components/AlertModal';
 
 interface AdminSetting {
   id: string;
@@ -32,6 +33,13 @@ export default function AdminSettings() {
     totalEnrollments: 0,
     totalQuizzes: 0,
     totalMaterials: 0
+  });
+
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
   });
 
   useEffect(() => {
@@ -120,13 +128,13 @@ export default function AdminSettings() {
 
     // Validate file type for images
     if (settings[settingKey]?.setting_type === 'image' && !file.type.startsWith('image/')) {
-      alert('Please upload an image file');
+      showAlert('Invalid File', 'Please upload an image file', 'warning');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      showAlert('File Too Large', 'File size must be less than 5MB', 'warning');
       return;
     }
 
@@ -156,7 +164,7 @@ export default function AdminSettings() {
 
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Failed to upload file');
+      showAlert('Upload Failed', 'Failed to upload file', 'error');
     } finally {
       setUploadingAssets(prev => {
         const newSet = new Set(prev);
@@ -186,7 +194,7 @@ export default function AdminSettings() {
       await updateSetting(settingKey, null);
     } catch (error) {
       console.error('Error removing asset:', error);
-      alert('Failed to remove asset');
+      showAlert('Remove Failed', 'Failed to remove asset', 'error');
     }
   };
 
@@ -219,7 +227,7 @@ export default function AdminSettings() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error(`Error exporting ${table}:`, error);
-      alert(`Failed to export ${table} data`);
+      showAlert('Export Failed', `Failed to export ${table} data`, 'error');
     }
   };
 
@@ -603,6 +611,15 @@ export default function AdminSettings() {
           Failed to save settings!
         </div>
       )}
+
+      {/* Alert Modal */}
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </div>
   );
 }

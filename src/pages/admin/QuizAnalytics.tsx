@@ -7,6 +7,7 @@ import {
   Download, Filter, Search, ChevronDown, ChevronUp,
   CheckCircle, XCircle, BarChart3, PieChart, Calendar
 } from 'lucide-react';
+import AlertModal from '../../components/AlertModal';
 
 interface QuizAttemptWithProfile extends QuizAttempt {
   profiles: Profile;
@@ -49,6 +50,12 @@ export default function QuizAnalytics() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'passed' | 'failed'>('all');
   const [sortBy, setSortBy] = useState<'date' | 'score' | 'name'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
 
   useEffect(() => {
     if (quizId && isAdmin()) {
@@ -204,7 +211,7 @@ export default function QuizAnalytics() {
       calculateStats(attemptsData || [], questionsData || []);
     } catch (error) {
       console.error('Error loading quiz analytics:', error);
-      alert('Failed to load quiz analytics');
+      showAlert('Error', 'Failed to load quiz analytics', 'error');
       navigate('/admin/quizzes');
     } finally {
       setLoading(false);
@@ -680,6 +687,14 @@ export default function QuizAnalytics() {
           )}
         </div>
       )}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </div>
   );
 }

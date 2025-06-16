@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, Quiz, Question, QuizAttempt } from '../lib/supabase';
 import { Brain, Clock, CheckCircle, XCircle, ArrowLeft, ArrowRight, AlertTriangle } from 'lucide-react';
+import AlertModal from '../components/AlertModal';
 
 export default function QuizTaking() {
   const { quizId } = useParams<{ quizId: string }>();
@@ -22,6 +23,21 @@ export default function QuizTaking() {
   const [canTakeQuiz, setCanTakeQuiz] = useState(true);
   const [attemptsUsed, setAttemptsUsed] = useState(0);
   const [currentAttemptNumber, setCurrentAttemptNumber] = useState(1);
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+    });
+  };
 
   useEffect(() => {
     if (quizId && profile) {
@@ -98,7 +114,7 @@ export default function QuizTaking() {
       }
     } catch (error) {
       console.error('Error loading quiz data:', error);
-      alert('Failed to load quiz');
+      showAlert('Error', 'Failed to load quiz', 'error');
       navigate(-1);
     } finally {
       setLoading(false);
@@ -129,7 +145,7 @@ export default function QuizTaking() {
       setQuizStarted(true);
     } catch (error) {
       console.error('Error starting quiz:', error);
-      alert('Failed to start quiz');
+      showAlert('Error', 'Failed to start quiz', 'error');
     }
   };
 
@@ -219,7 +235,7 @@ export default function QuizTaking() {
       setAttemptsUsed(prev => prev + 1);
     } catch (error) {
       console.error('Error submitting quiz:', error);
-      alert('Failed to submit quiz');
+      showAlert('Error', 'Failed to submit quiz', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -688,6 +704,14 @@ export default function QuizTaking() {
           ))}
         </div>
       </div>
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
     </div>
   );
 }

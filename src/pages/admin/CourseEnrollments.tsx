@@ -7,6 +7,8 @@ import {
   UserPlus, UserMinus, Filter, ChevronDown, ChevronUp,
   Mail, Calendar, BookOpen
 } from 'lucide-react';
+import AlertModal from '../../components/AlertModal';
+import ConfirmModal from '../../components/ConfirmModal';
 
 interface EnrollmentWithProfile extends Enrollment {
   profiles: Profile;
@@ -26,6 +28,20 @@ export default function CourseEnrollments() {
   const [enrolling, setEnrolling] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'enrolled_at'>('enrolled_at');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning',
+    loading: false,
+  });
 
   useEffect(() => {
     if (courseId && isAdmin()) {
@@ -57,7 +73,9 @@ export default function CourseEnrollments() {
           .single();
 
         if (!adminCheck) {
-          alert('You do not have permission to manage enrollments for this course.');
+          // alert('You do not have permission to manage enrollments for this course.');
+          // navigate('/admin/courses');
+          showAlert('Access Denied', 'You do not have permission to manage enrollments for this course.', 'error');
           navigate('/admin/courses');
           return;
         }
@@ -97,7 +115,9 @@ export default function CourseEnrollments() {
       setAvailableUsers(availableData || []);
     } catch (error) {
       console.error('Error loading course data:', error);
-      alert('Failed to load course data');
+      // alert('Failed to load course data');
+      // navigate('/admin/courses');
+      showAlert('Error', 'Failed to load course data', 'error');
       navigate('/admin/courses');
     } finally {
       setLoading(false);
@@ -126,31 +146,41 @@ export default function CourseEnrollments() {
       setSelectedUsers(new Set());
     } catch (error) {
       console.error('Error enrolling users:', error);
-      alert('Failed to enroll users');
+      // alert('Failed to enroll users');
+      showAlert('Error', 'Failed to enroll users', 'error');
     } finally {
       setEnrolling(false);
     }
   };
 
   const handleUnenrollUser = async (enrollmentId: string, userName: string) => {
-    if (!confirm(`Are you sure you want to remove "${userName}" from this course? This action cannot be undone.`)) {
-      return;
-    }
+    // if (!confirm(`Are you sure you want to remove "${userName}" from this course? This action cannot be undone.`)) {
+    //   return;
+    // }
 
-    try {
-      const { error } = await supabase
-        .from('enrollments')
-        .delete()
-        .eq('id', enrollmentId);
+    showConfirm(
+      'Remove Student',
+      `Are you sure you want to remove "${userName}" from this course? This action cannot be undone.`,
+      async () => {
+        try {
+          const { error } = await supabase
+            .from('enrollments')
+            .delete()
+            .eq('id', enrollmentId);
 
-      if (error) throw error;
+          if (error) throw error;
 
-      // Reload data
-      await loadCourseData();
-    } catch (error) {
-      console.error('Error unenrolling user:', error);
-      alert('Failed to remove student from course');
-    }
+          // Reload data
+          await loadCourseData();
+        } catch (error) {
+          console.error('Error unenrolling user:', error);
+          // alert('Failed to remove student from course');
+          showAlert('Error', 'Failed to remove student from course', 'error');
+        }
+      },
+      'danger'
+    );
+    return;
   };
 
   const toggleUserSelection = (userId: string) => {
@@ -504,6 +534,23 @@ export default function CourseEnrollments() {
           </div>
         </div>
       )}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        loading={confirmModal.loading}
+      />
     </div>
   );
 }

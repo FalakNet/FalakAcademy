@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import CertificateGenerator from '../components/CertificateGenerator';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import AlertModal from '../components/AlertModal';
 
 interface SectionWithContent extends CourseSection {
   content: SectionContent[];
@@ -45,6 +46,12 @@ export default function CourseDetail() {
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [quizAttempts, setQuizAttempts] = useState<Map<string, QuizAttemptSummary>>(new Map());
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
+  });
 
   useEffect(() => {
     if (courseId && profile) {
@@ -104,7 +111,12 @@ export default function CourseDetail() {
         .single();
 
       if (!enrollment) {
-        alert('You are not enrolled in this course.');
+        setAlertModal({
+          isOpen: true,
+          title: 'Not Enrolled',
+          message: 'You are not enrolled in this course.',
+          type: 'warning',
+        });
         navigate('/available-courses');
         return;
       }
@@ -228,7 +240,12 @@ export default function CourseDetail() {
 
     } catch (error) {
       console.error('Error loading course data:', error);
-      alert('Failed to load course data');
+      setAlertModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to load course data',
+        type: 'error',
+      });
       navigate('/my-courses');
     } finally {
       setLoading(false);
@@ -386,7 +403,12 @@ export default function CourseDetail() {
 
     const { canComplete, reason } = canMarkContentComplete(content);
     if (!canComplete) {
-      alert(reason || 'Cannot mark this content as complete');
+      setAlertModal({
+        isOpen: true,
+        title: 'Cannot Complete',
+        message: reason || 'Cannot mark this content as complete',
+        type: 'warning',
+      });
       return;
     }
 
@@ -459,7 +481,12 @@ export default function CourseDetail() {
       
     } catch (error) {
       console.error('Error completing course:', error);
-      alert('Failed to complete course. Please try again.');
+      setAlertModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to complete course. Please try again.',
+        type: 'error',
+      });
     }
   };
 
@@ -802,399 +829,408 @@ export default function CourseDetail() {
   const isFullyCompleted = publishedCompletedCount === allContent.length && allContent.length > 0;
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col`}>
-        {/* Course Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-3">
-            <button
-              onClick={() => navigate('/my-courses')}
-              className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Courses
-            </button>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 lg:hidden"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{course.title}</h1>
-          
-          {/* Course Completion Status */}
-          {courseCompletion && (
-            <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <div className="flex items-center">
-                <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-green-800 dark:text-green-200">Course Completed!</p>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Completed on {new Date(courseCompletion.completed_at).toLocaleDateString()}
-                  </p>
+    <>
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+        {/* Sidebar */}
+        <div className={`${sidebarOpen ? 'w-80' : 'w-0'} transition-all duration-300 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col`}>
+          {/* Course Header */}
+          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <button
+                onClick={() => navigate('/my-courses')}
+                className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Back to Courses
+              </button>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 lg:hidden"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{course.title}</h1>
+            
+            {/* Course Completion Status */}
+            {courseCompletion && (
+              <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-center">
+                  <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800 dark:text-green-200">Course Completed!</p>
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      Completed on {new Date(courseCompletion.completed_at).toLocaleDateString()}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          {/* Progress - Now includes unpublished content */}
-          <div className="mb-3">
-            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
-              <span>Progress</span>
-              <span>{completedCount}/{totalContentCount} completed</span>
-            </div>
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-              <div 
-                className={`h-2 rounded-full transition-all duration-300 ${
-                  isFullyCompleted ? 'bg-green-600' : 'bg-blue-600'
-                }`}
-                style={{ width: `${progressPercentage}%` }}
-              ></div>
-            </div>
-            {isFullyCompleted && !courseCompletion && (
-              <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
-                🎉 All content completed! Ready to get your certificate.
-              </p>
             )}
-            {totalContentCount > allContent.length}
+            
+            {/* Progress - Now includes unpublished content */}
+            <div className="mb-3">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <span>Progress</span>
+                <span>{completedCount}/{totalContentCount} completed</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    isFullyCompleted ? 'bg-green-600' : 'bg-blue-600'
+                  }`}
+                  style={{ width: `${progressPercentage}%` }}
+                ></div>
+              </div>
+              {isFullyCompleted && !courseCompletion && (
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
+                  🎉 All content completed! Ready to get your certificate.
+                </p>
+              )}
+              {totalContentCount > allContent.length}
+            </div>
           </div>
-        </div>
 
-        {/* Sections List */}
-        <div className="flex-1 overflow-y-auto">
-          {sections.map((section) => (
-            <div key={section.id} className="border-b border-gray-100 dark:border-gray-700">
-              <button
-                onClick={() => toggleSection(section.id)}
-                className="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900 dark:text-white">{section.title}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{section.content.length} items</p>
+          {/* Sections List */}
+          <div className="flex-1 overflow-y-auto">
+            {sections.map((section) => (
+              <div key={section.id} className="border-b border-gray-100 dark:border-gray-700">
+                <button
+                  onClick={() => toggleSection(section.id)}
+                  className="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium text-gray-900 dark:text-white">{section.title}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{section.content.length} items</p>
+                    </div>
+                    {expandedSections.has(section.id) ? (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    )}
                   </div>
-                  {expandedSections.has(section.id) ? (
-                    <ChevronDown className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                  )}
-                </div>
-              </button>
+                </button>
 
-              {expandedSections.has(section.id) && (
-                <div className="pb-2">
-                  {section.content.map((content) => {
-                    const isCompleted = completions.has(content.id);
-                    const isCurrent = currentContent?.id === content.id;
-                    const isQuiz = content.content_type === 'quiz';
-                    const quizId = isQuiz ? content.content_data?.quiz_id : null;
-                    const attemptSummary = quizId ? quizAttempts.get(quizId) : null;
-                    
-                    return (
-                      <button
-                        key={content.id}
-                        onClick={() => setCurrentContent({
-                          ...content,
-                          completed: isCompleted,
-                          completion: completions.get(content.id)
-                        })}
-                        className={`w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-l-2 ${
-                          isCurrent 
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                            : 'border-transparent'
-                        }`}
-                      >
-                        <div className="flex items-center ml-4">
-                          {getContentIcon(content.content_type)}
-                          <div className="ml-3 flex-1">
-                            <div className="flex items-center justify-between">
-                              <h4 className={`text-sm font-medium ${
-                                isCurrent ? 'text-blue-900 dark:text-blue-200' : 'text-gray-900 dark:text-white'
-                              }`}>
-                                {content.title}
-                              </h4>
-                              <div className="flex items-center space-x-1">
-                                {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
-                                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                    attemptSummary.passed 
-                                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                      : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                                  }`}>
-                                    {attemptSummary.bestScore}%
-                                  </span>
+                {expandedSections.has(section.id) && (
+                  <div className="pb-2">
+                    {section.content.map((content) => {
+                      const isCompleted = completions.has(content.id);
+                      const isCurrent = currentContent?.id === content.id;
+                      const isQuiz = content.content_type === 'quiz';
+                      const quizId = isQuiz ? content.content_data?.quiz_id : null;
+                      const attemptSummary = quizId ? quizAttempts.get(quizId) : null;
+                      
+                      return (
+                        <button
+                          key={content.id}
+                          onClick={() => setCurrentContent({
+                            ...content,
+                            completed: isCompleted,
+                            completion: completions.get(content.id)
+                          })}
+                          className={`w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-l-2 ${
+                            isCurrent 
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                              : 'border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center ml-4">
+                            {getContentIcon(content.content_type)}
+                            <div className="ml-3 flex-1">
+                              <div className="flex items-center justify-between">
+                                <h4 className={`text-sm font-medium ${
+                                  isCurrent ? 'text-blue-900 dark:text-blue-200' : 'text-gray-900 dark:text-white'
+                                }`}>
+                                  {content.title}
+                                </h4>
+                                <div className="flex items-center space-x-1">
+                                  {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
+                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                                      attemptSummary.passed 
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+                                    }`}>
+                                      {attemptSummary.bestScore}%
+                                    </span>
+                                  )}
+                                  {isCompleted && (
+                                    <CheckCircle className="w-4 h-4 text-green-500" />
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                <span className="capitalize">{content.content_type}</span>
+                                {content.duration_minutes > 0 && (
+                                  <>
+                                    <span className="mx-1">•</span>
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    <span>{content.duration_minutes} min</span>
+                                  </>
                                 )}
-                                {isCompleted && (
-                                  <CheckCircle className="w-4 h-4 text-green-500" />
+                                {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
+                                  <>
+                                    <span className="mx-1">•</span>
+                                    <span>{attemptSummary.totalAttempts} attempt{attemptSummary.totalAttempts !== 1 ? 's' : ''}</span>
+                                  </>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              <span className="capitalize">{content.content_type}</span>
-                              {content.duration_minutes > 0 && (
-                                <>
-                                  <span className="mx-1">•</span>
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  <span>{content.duration_minutes} min</span>
-                                </>
-                              )}
-                              {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
-                                <>
-                                  <span className="mx-1">•</span>
-                                  <span>{attemptSummary.totalAttempts} attempt{attemptSummary.totalAttempts !== 1 ? 's' : ''}</span>
-                                </>
-                              )}
-                            </div>
                           </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              {!sidebarOpen && (
-                <button
-                  onClick={() => setSidebarOpen(true)}
-                  className="mr-3 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                >
-                  <Menu className="w-5 h-5" />
-                </button>
-              )}
-              
-              {currentContent && (
-                <div className="flex items-center">
-                  {getContentIcon(currentContent.content_type)}
-                  <div className="ml-3">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{currentContent.title}</h2>
-                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                      <span className="capitalize">{currentContent.content_type}</span>
-                      {currentContent.duration_minutes > 0 && (
-                        <>
-                          <span className="mx-2">•</span>
-                          <Clock className="w-4 h-4 mr-1" />
-                          <span>{currentContent.duration_minutes} min</span>
-                        </>
-                      )}
-                    </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
-            <div className="flex items-center space-x-3">
-              {/* Complete Course Button */}
-              {isFullyCompleted && !courseCompletion && (
-                <button
-                  onClick={() => setShowCompletionModal(true)}
-                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg"
-                >
-                  <Trophy className="w-4 h-4 mr-2" />
-                  Complete Course
-                  {course.enable_certificates && " & Get Certificate"}
-                </button>
-              )}
-
-              {/* Mark Content Complete Button */}
-              {currentContent && !currentContent.completed && (() => {
-                const { canComplete, reason } = canMarkContentComplete(currentContent);
-                return (
-                  <div className="relative">
-                    <button
-                      onClick={() => canComplete ? markContentComplete(currentContent.id) : null}
-                      disabled={!canComplete}
-                      className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors ${
-                        canComplete
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                      }`}
-                      title={!canComplete ? reason : 'Mark as complete'}
-                    >
-                      {!canComplete && currentContent.content_type === 'quiz' && (
-                        <AlertCircle className="w-4 h-4 mr-2" />
-                      )}
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Mark Complete
-                    </button>
-                    {!canComplete && reason && (
-                      <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                        {reason}
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col">
+          {/* Top Bar */}
+          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                {!sidebarOpen && (
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="mr-3 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </button>
+                )}
+                
+                {currentContent && (
+                  <div className="flex items-center">
+                    {getContentIcon(currentContent.content_type)}
+                    <div className="ml-3">
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{currentContent.title}</h2>
+                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                        <span className="capitalize">{currentContent.content_type}</span>
+                        {currentContent.duration_minutes > 0 && (
+                          <>
+                            <span className="mx-2">•</span>
+                            <Clock className="w-4 h-4 mr-1" />
+                            <span>{currentContent.duration_minutes} min</span>
+                          </>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* View Certificate Button */}
-              {courseCompletion && certificate && course.enable_certificates && (
-                <button
-                  onClick={() => setShowCertificateModal(true)}
-                  className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200"
-                >
-                  <Award className="w-4 h-4 mr-2" />
-                  View Certificate
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          {renderContent()}
-        </div>
-
-        {/* Navigation Footer */}
-        <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigateToContent('prev')}
-              disabled={currentIndex <= 0}
-              className="inline-flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Previous
-            </button>
-
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {currentIndex >= 0 && (
-                <span>{currentIndex + 1} of {allContent.length}</span>
-              )}
-            </div>
-
-            <button
-              onClick={() => navigateToContent('next')}
-              disabled={currentIndex >= allContent.length - 1}
-              className="inline-flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Course Completion Modal */}
-      {showCompletionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 w-full max-w-md mx-4">
-            <div className="text-center">
-              <div className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Trophy className="w-10 h-10 text-white" />
-              </div>
-              
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                🎉 Congratulations!
-              </h2>
-              
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                You have completed all the content in this course.
-                {course.enable_certificates ? " Are you ready to receive your certificate of completion?" : ""}
-              </p>
-
-              {course.enable_certificates && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-                  <div className="flex items-start">
-                    <Award className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
-                    <div className="text-left">
-                      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Certificate Benefits</p>
-                      <ul className="text-sm text-blue-600 dark:text-blue-300 mt-1 space-y-1">
-                        <li>• Official completion certificate</li>
-                        <li>• Downloadable PDF format</li>
-                        <li>• Unique certificate number</li>
-                        <li>• Shareable achievement</li>
-                      </ul>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
-              {!course.enable_certificates && (
-                <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
-                  <div className="flex items-start">
-                    <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400 mt-0.5 mr-2" />
-                    <div className="text-left">
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">No Certificate Available</p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        This course does not issue certificates upon completion. Your progress and completion status will still be recorded.
-                      </p>
+              <div className="flex items-center space-x-3">
+                {/* Complete Course Button */}
+                {isFullyCompleted && !courseCompletion && (
+                  <button
+                    onClick={() => setShowCompletionModal(true)}
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg"
+                  >
+                    <Trophy className="w-4 h-4 mr-2" />
+                    Complete Course
+                    {course.enable_certificates && " & Get Certificate"}
+                  </button>
+                )}
+
+                {/* Mark Content Complete Button */}
+                {currentContent && !currentContent.completed && (() => {
+                  const { canComplete, reason } = canMarkContentComplete(currentContent);
+                  return (
+                    <div className="relative">
+                      <button
+                        onClick={() => canComplete ? markContentComplete(currentContent.id) : null}
+                        disabled={!canComplete}
+                        className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors ${
+                          canComplete
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                        title={!canComplete ? reason : 'Mark as complete'}
+                      >
+                        {!canComplete && currentContent.content_type === 'quiz' && (
+                          <AlertCircle className="w-4 h-4 mr-2" />
+                        )}
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Mark Complete
+                      </button>
+                      {!canComplete && reason && (
+                        <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
+                          {reason}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </div>
-              )}
+                  );
+                })()}
 
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowCompletionModal(false)}
-                  className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  Not Yet
-                </button>
-                <button
-                  onClick={completeCourse}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
-                >
-                  {course.enable_certificates ? "Get My Certificate!" : "Complete Course"}
-                </button>
+                {/* View Certificate Button */}
+                {courseCompletion && certificate && course.enable_certificates && (
+                  <button
+                    onClick={() => setShowCertificateModal(true)}
+                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200"
+                  >
+                    <Award className="w-4 h-4 mr-2" />
+                    View Certificate
+                  </button>
+                )}
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Certificate Modal */}
-      {showCertificateModal && certificate && course.enable_certificates && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Certificate</h2>
-                <button
-                  onClick={() => setShowCertificateModal(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  <X className="w-6 h-6" />
-                </button>
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {renderContent()}
+          </div>
+
+          {/* Navigation Footer */}
+          <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => navigateToContent('prev')}
+                disabled={currentIndex <= 0}
+                className="inline-flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Previous
+              </button>
+
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {currentIndex >= 0 && (
+                  <span>{currentIndex + 1} of {allContent.length}</span>
+                )}
               </div>
-              
-              <CertificateGenerator 
-                certificate={certificate} 
-                profile={profile!}
-                onDownload={() => {
-                  console.log('Certificate downloaded:', certificate.certificate_number);
-                }}
-              />
-              
-              <div className="mt-6 text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  🎉 Congratulations on completing the course! Your certificate is ready for download.
+
+              <button
+                onClick={() => navigateToContent('next')}
+                disabled={currentIndex >= allContent.length - 1}
+                className="inline-flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Next
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Course Completion Modal */}
+        {showCompletionModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-8 w-full max-w-md mx-4">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Trophy className="w-10 h-10 text-white" />
+                </div>
+                
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                  🎉 Congratulations!
+                </h2>
+                
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  You have completed all the content in this course.
+                  {course.enable_certificates ? " Are you ready to receive your certificate of completion?" : ""}
                 </p>
-                <button
-                  onClick={() => {
-                    setShowCertificateModal(false);
-                    navigate('/certificates');
-                  }}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  View All Certificates
-                </button>
+
+                {course.enable_certificates && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                    <div className="flex items-start">
+                      <Award className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Certificate Benefits</p>
+                        <ul className="text-sm text-blue-600 dark:text-blue-300 mt-1 space-y-1">
+                          <li>• Official completion certificate</li>
+                          <li>• Downloadable PDF format</li>
+                          <li>• Unique certificate number</li>
+                          <li>• Shareable achievement</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!course.enable_certificates && (
+                  <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
+                    <div className="flex items-start">
+                      <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400 mt-0.5 mr-2" />
+                      <div className="text-left">
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">No Certificate Available</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          This course does not issue certificates upon completion. Your progress and completion status will still be recorded.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowCompletionModal(false)}
+                    className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Not Yet
+                  </button>
+                  <button
+                    onClick={completeCourse}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
+                  >
+                    {course.enable_certificates ? "Get My Certificate!" : "Complete Course"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Certificate Modal */}
+        {showCertificateModal && certificate && course.enable_certificates && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Certificate</h2>
+                  <button
+                    onClick={() => setShowCertificateModal(false)}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+                
+                <CertificateGenerator 
+                  certificate={certificate} 
+                  profile={profile!}
+                  onDownload={() => {
+                    console.log('Certificate downloaded:', certificate.certificate_number);
+                  }}
+                />
+                
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    🎉 Congratulations on completing the course! Your certificate is ready for download.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowCertificateModal(false);
+                      navigate('/certificates');
+                    }}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    View All Certificates
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }

@@ -3,6 +3,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase, Quiz, Question, Course } from '../../lib/supabase';
 import { Brain, Edit2, Trash2, Clock, HelpCircle, Eye, Users, X, BarChart3, Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import AlertModal from '../../components/AlertModal';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function AdminQuizzes() {
   const { profile, isAdmin } = useAuth();
@@ -21,6 +23,20 @@ export default function AdminQuizzes() {
     correct_option: 0,
     points: 1,
     order_index: 0
+  });
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+  });
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'warning',
+    loading: false,
   });
 
   useEffect(() => {
@@ -112,28 +128,26 @@ export default function AdminQuizzes() {
       setEditingQuiz(null);
     } catch (error) {
       console.error('Error updating quiz:', error);
-      alert('Failed to update quiz');
+      showAlert('Error', 'Failed to update quiz', 'error');
     }
   };
 
   const deleteQuiz = async (quizId: string) => {
-    if (!confirm('Are you sure you want to delete this quiz? This will also delete all questions and attempts. This action cannot be undone.')) {
-      return;
-    }
+    showConfirm('Confirm Delete', 'Are you sure you want to delete this quiz? This will also delete all questions and attempts. This action cannot be undone.', async () => {
+      try {
+        const { error } = await supabase
+          .from('quizzes')
+          .delete()
+          .eq('id', quizId);
 
-    try {
-      const { error } = await supabase
-        .from('quizzes')
-        .delete()
-        .eq('id', quizId);
+        if (error) throw error;
 
-      if (error) throw error;
-
-      setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
-    } catch (error) {
-      console.error('Error deleting quiz:', error);
-      alert('Failed to delete quiz');
-    }
+        setQuizzes(quizzes.filter(quiz => quiz.id !== quizId));
+      } catch (error) {
+        console.error('Error deleting quiz:', error);
+        showAlert('Error', 'Failed to delete quiz', 'error');
+      }
+    });
   };
 
   const createQuestion = async () => {
@@ -142,12 +156,12 @@ export default function AdminQuizzes() {
       const filteredOptions = newQuestion.options.filter(option => option.trim() !== '');
       
       if (filteredOptions.length < 2) {
-        alert('Please provide at least 2 options');
+        showAlert('Warning', 'Please provide at least 2 options', 'warning');
         return;
       }
 
       if (newQuestion.correct_option >= filteredOptions.length) {
-        alert('Please select a valid correct option');
+        showAlert('Warning', 'Please select a valid correct option', 'warning');
         return;
       }
 
@@ -176,7 +190,7 @@ export default function AdminQuizzes() {
       });
     } catch (error) {
       console.error('Error creating question:', error);
-      alert('Failed to create question');
+      showAlert('Error', 'Failed to create question', 'error');
     }
   };
 
@@ -188,12 +202,12 @@ export default function AdminQuizzes() {
       const filteredOptions = editingQuestion.options.filter(option => option.trim() !== '');
       
       if (filteredOptions.length < 2) {
-        alert('Please provide at least 2 options');
+        showAlert('Warning', 'Please provide at least 2 options', 'warning');
         return;
       }
 
       if (editingQuestion.correct_option >= filteredOptions.length) {
-        alert('Please select a valid correct option');
+        showAlert('Warning', 'Please select a valid correct option', 'warning');
         return;
       }
 
@@ -218,32 +232,30 @@ export default function AdminQuizzes() {
       setEditingQuestion(null);
     } catch (error) {
       console.error('Error updating question:', error);
-      alert('Failed to update question');
+      showAlert('Error', 'Failed to update question', 'error');
     }
   };
 
   const deleteQuestion = async (questionId: string) => {
-    if (!confirm('Are you sure you want to delete this question? This action cannot be undone.')) {
-      return;
-    }
+    showConfirm('Confirm Delete', 'Are you sure you want to delete this question? This action cannot be undone.', async () => {
+      try {
+        const { error } = await supabase
+          .from('questions')
+          .delete()
+          .eq('id', questionId);
 
-    try {
-      const { error } = await supabase
-        .from('questions')
-        .delete()
-        .eq('id', questionId);
+        if (error) throw error;
 
-      if (error) throw error;
-
-      // Reload questions and quiz data
-      if (selectedQuiz) {
-        await loadQuestions(selectedQuiz.id);
+        // Reload questions and quiz data
+        if (selectedQuiz) {
+          await loadQuestions(selectedQuiz.id);
+        }
+        loadQuizzes();
+      } catch (error) {
+        console.error('Error deleting question:', error);
+        showAlert('Error', 'Failed to delete question', 'error');
       }
-      loadQuizzes();
-    } catch (error) {
-      console.error('Error deleting question:', error);
-      alert('Failed to delete question');
-    }
+    });
   };
 
   const viewQuestions = async (quiz: Quiz) => {
@@ -271,6 +283,26 @@ export default function AdminQuizzes() {
       newOptions[index] = value;
       setNewQuestion({ ...newQuestion, options: newOptions });
     }
+  };
+
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
+    setAlertModal({
+      isOpen: true,
+      title,
+      message,
+      type,
+    });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void, type: 'danger' | 'warning' | 'info' = 'warning') => {
+    setConfirmModal({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      type,
+      loading: false,
+    });
   };
 
   if (!isAdmin()) {
@@ -733,6 +765,23 @@ export default function AdminQuizzes() {
           </div>
         </div>
       )}
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        onClose={() => setAlertModal((prev) => ({ ...prev, isOpen: false }))}
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        type={confirmModal.type}
+        loading={confirmModal.loading}
+      />
     </div>
   );
 }
