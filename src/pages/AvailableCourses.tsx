@@ -36,6 +36,7 @@ export default function AvailableCourses() {
         .from('courses')
         .select('*')
         .eq('is_public', true)
+        .or('published_at.is.null,published_at.lte.' + new Date().toISOString())
         .order('created_at', { ascending: false });
 
       if (coursesError) throw coursesError;

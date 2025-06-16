@@ -27,7 +27,8 @@ export default function CourseContentManager() {
     title: '',
     description: '',
     order_index: 0,
-    is_published: false // Add published state
+    is_published: true, // Default to published
+    published_at: '' // Add published_at field
   });
 
   const [newContent, setNewContent] = useState({
@@ -63,7 +64,8 @@ export default function CourseContentManager() {
         .from('course_sections')
         .select('*')
         .eq('course_id', courseId)
-        .order('order_index');
+        .order('order_index')
+        .or('published_at.is.null,published_at.lte.' + new Date().toISOString());
 
       if (sectionsError) throw sectionsError;
 
@@ -134,6 +136,7 @@ export default function CourseContentManager() {
         .from('course_sections')
         .insert({
           ...newSection,
+          published_at: newSection.published_at ? new Date(newSection.published_at).toISOString() : null,
           course_id: courseId,
           created_by: profile?.id,
           order_index: nextOrderIndex
@@ -153,7 +156,8 @@ export default function CourseContentManager() {
         title: '', 
         description: '', 
         order_index: 0, 
-        is_published: false 
+        is_published: false,
+        published_at: ''
       });
     } catch (error) {
       console.error('Error creating section:', error);
@@ -170,7 +174,8 @@ export default function CourseContentManager() {
         .update({
           title: editingSection.title,
           description: editingSection.description,
-          is_published: editingSection.is_published
+          is_published: editingSection.is_published,
+          published_at: editingSection.published_at ? new Date(editingSection.published_at).toISOString() : null
         })
         .eq('id', editingSection.id);
 
@@ -860,6 +865,18 @@ export default function CourseContentManager() {
                   Publish this section immediately
                 </label>
               </div>
+
+              {/* Publishing DateTime Picker */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Publish Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={newSection.published_at}
+                  onChange={(e) => setNewSection({ ...newSection, published_at: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave blank to keep as draft or publish immediately.</p>
+              </div>
               
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                 <div className="flex items-start">
@@ -1030,6 +1047,18 @@ export default function CourseContentManager() {
                 <label htmlFor="edit_section_published" className="ml-2 text-sm text-gray-700">
                   Publish this section
                 </label>
+              </div>
+
+              {/* Publish DateTime Picker */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Publish Date & Time</label>
+                <input
+                  type="datetime-local"
+                  value={editingSection.published_at ? editingSection.published_at.substring(0, 16) : ''}
+                  onChange={(e) => setEditingSection({ ...editingSection, published_at: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Leave blank to keep as draft or publish immediately.</p>
               </div>
             </div>
             <div className="flex justify-end space-x-3 mt-6">

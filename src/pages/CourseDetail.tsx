@@ -148,7 +148,7 @@ export default function CourseDetail() {
         .from('course_sections')
         .select('*')
         .eq('course_id', courseId)
-        .eq('is_published', true)
+        .or('published_at.is.null,published_at.lte.' + new Date().toISOString())
         .order('order_index');
 
       if (sectionsError) throw sectionsError;

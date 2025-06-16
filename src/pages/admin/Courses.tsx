@@ -611,11 +611,19 @@ export default function AdminCourses() {
                         <Crown className="w-3 h-3 mr-1" />
                         Premium
                       </span>
-                      {price && (
-                        <span className="px-2 py-1 text-xs font-bold rounded-full bg-white/90 text-gray-900 backdrop-blur-sm">
+                      <div className="flex items-center space-x-2">
+                      {isPaid && price && (
+                        <span
+                          className={`
+                            px-3 py-1 text-sm font-bold rounded-full
+                            bg-white/90 text-gray-900 backdrop-blur-sm
+                            dark:bg-gray-900/90 dark:text-white
+                          `}
+                        >
                           {price}
                         </span>
                       )}
+                    </div>
                     </>
                   )}
                 </div>
@@ -866,6 +874,17 @@ export default function AdminCourses() {
                     Issue certificates upon course completion
                   </label>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Publish Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={newCourse.published_at || ''}
+                    onChange={e => setNewCourse({ ...newCourse, published_at: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leave blank to publish immediately.</p>
+                </div>
                 
                 {!newCourse.is_public && (
                   <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
@@ -1055,6 +1074,17 @@ export default function AdminCourses() {
                   <label htmlFor="edit_enable_certificates" className="text-sm text-gray-700">
                     Issue certificates upon course completion
                   </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Publish Date & Time</label>
+                  <input
+                    type="datetime-local"
+                    value={editingCourse.published_at ? new Date(editingCourse.published_at).toISOString().slice(0, 16) : ''}
+                    onChange={e => setEditingCourse({ ...editingCourse, published_at: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Leave blank to publish immediately.</p>
                 </div>
                 
                 {!editingCourse.is_public && (
