@@ -42,6 +42,9 @@ export default function AdminSettings() {
     type: 'info',
   });
 
+  // New: Track draft settings separately for editing
+  const [draftSettings, setDraftSettings] = useState<Record<string, any>>({});
+
   useEffect(() => {
     if (isSuperAdmin()) {
       loadSettings();
@@ -198,11 +201,16 @@ export default function AdminSettings() {
     }
   };
 
+  // Save all changed settings
   const saveAllSettings = async () => {
     setSaveStatus('saving');
-    
     try {
-      // All settings are saved individually, so this is just a status update
+      const changed = Object.entries(draftSettings).filter(
+        ([key, value]) => settings[key]?.setting_value !== value
+      );
+      for (const [key, value] of changed) {
+        await updateSetting(key, value);
+      }
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (error) {
@@ -231,8 +239,13 @@ export default function AdminSettings() {
     }
   };
 
+  // Update draft setting locally
+  const handleDraftChange = (key: string, value: any) => {
+    setDraftSettings(prev => ({ ...prev, [key]: value }));
+  };
+
   const renderSettingInput = (setting: AdminSetting) => {
-    const value = setting.setting_value;
+    const value = draftSettings[setting.setting_key];
     const isUploading = uploadingAssets.has(setting.setting_key);
 
     switch (setting.setting_type) {
@@ -243,9 +256,9 @@ export default function AdminSettings() {
           <input
             type={setting.setting_type === 'email' ? 'email' : setting.setting_type === 'url' ? 'url' : 'text'}
             value={value || ''}
-            onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+            onChange={(e) => handleDraftChange(setting.setting_key, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-            placeholder={setting.description}
+            placeholder={settings[setting.setting_key]?.setting_value || ''}
           />
         );
 
@@ -254,7 +267,7 @@ export default function AdminSettings() {
           <input
             type="number"
             value={value || 0}
-            onChange={(e) => updateSetting(setting.setting_key, parseInt(e.target.value) || 0)}
+            onChange={(e) => handleDraftChange(setting.setting_key, parseInt(e.target.value) || 0)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
             min="0"
           />
@@ -266,7 +279,7 @@ export default function AdminSettings() {
             <input
               type="checkbox"
               checked={value || false}
-              onChange={(e) => updateSetting(setting.setting_key, e.target.checked)}
+              onChange={(e) => handleDraftChange(setting.setting_key, e.target.checked)}
               className="mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
             />
             <span className="text-sm text-gray-700">
@@ -281,15 +294,15 @@ export default function AdminSettings() {
             <input
               type="color"
               value={value || '#2563eb'}
-              onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+              onChange={(e) => handleDraftChange(setting.setting_key, e.target.value)}
               className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
             />
             <input
               type="text"
               value={value || '#2563eb'}
-              onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+              onChange={(e) => handleDraftChange(setting.setting_key, e.target.value)}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-              placeholder="#2563eb"
+              placeholder={settings[setting.setting_key]?.setting_value || '#2563eb'}
             />
           </div>
         );
@@ -299,7 +312,7 @@ export default function AdminSettings() {
           return (
             <select
               value={value || 'USER'}
-              onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+              onChange={(e) => handleDraftChange(setting.setting_key, e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="USER">User</option>
@@ -327,7 +340,6 @@ export default function AdminSettings() {
                 </button>
               </div>
             )}
-            
             <div className="flex items-center space-x-3">
               <input
                 ref={(el) => fileInputRefs.current[setting.setting_key] = el}
@@ -374,7 +386,7 @@ export default function AdminSettings() {
           <input
             type="text"
             value={value || ''}
-            onChange={(e) => updateSetting(setting.setting_key, e.target.value)}
+            onChange={(e) => handleDraftChange(setting.setting_key, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
           />
         );

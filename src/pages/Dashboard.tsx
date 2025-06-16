@@ -296,11 +296,8 @@ export default function Dashboard() {
     <div className="space-y-6 sm:space-y-8">
       {/* Header */}
       <div className="flex items-start sm:items-center">
-        <div className="p-2 sm:p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg mr-3 sm:mr-4 flex-shrink-0">
-          <welcome.icon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 dark:text-blue-400" />
-        </div>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white truncate">{welcome.title}</h1>
+          <h1 className="text-2xl sm:text-2xl font-bold text-gray-900 dark:text-white truncate">{welcome.title}</h1>
           <p className="mt-1 sm:mt-2 text-sm sm:text-base text-gray-600 dark:text-gray-400">{welcome.subtitle}</p>
         </div>
       </div>
