@@ -2,6 +2,7 @@
 // For most use cases, the plugin's default service worker is sufficient.
 
 // You can add custom caching strategies here if needed.
+importScripts("https://progressier.app/8SFsDvZdKdlugk7SKKq9/sw.js" );
 
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
