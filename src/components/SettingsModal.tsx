@@ -29,7 +29,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   if (!isOpen) return null;
 
   const handleThemeChange = (newTheme: Theme) => {
-    console.log('Theme button clicked:', newTheme);
     setTheme(newTheme);
   };
 
@@ -95,9 +94,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   Theme
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Current theme: <span className="font-medium capitalize">{theme}</span>
+                  Current theme: <span className="font-medium capitalize">{theme === 'system' ? 'System (auto)' : theme}</span>
                 </p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => handleThemeChange('light')}
@@ -121,6 +120,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   >
                     <Moon className="w-6 h-6 mr-2 text-blue-500" />
                     <span className="font-medium text-gray-900 dark:text-white">Dark</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleThemeChange('system')}
+                    className={`flex items-center justify-center p-4 rounded-lg border-2 transition-all duration-200 ${
+                      theme === 'system'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-200 dark:ring-blue-800'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <Monitor className="w-6 h-6 mr-2 text-gray-500 dark:text-gray-300" />
+                    <span className="font-medium text-gray-900 dark:text-white">System</span>
                   </button>
                 </div>
               </div>

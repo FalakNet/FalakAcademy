@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-export type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'system';
 export type ColorBlindType = 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia';
 
 interface SettingsContextType {
@@ -19,7 +19,7 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('light');
+  const [theme, setThemeState] = useState<Theme>('system');
   const [colorBlindType, setColorBlindTypeState] = useState<ColorBlindType>('none');
   const [highContrast, setHighContrastState] = useState(false);
   const [reducedMotion, setReducedMotionState] = useState(false);
@@ -34,7 +34,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const savedReducedMotion = localStorage.getItem('reducedMotion') === 'true';
     const savedFontSize = parseInt(localStorage.getItem('fontSize') || '16');
 
-    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
+    if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system')) {
       setThemeState(savedTheme);
     }
     if (savedColorBlind) {
@@ -46,18 +46,39 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setIsInitialized(true);
   }, []);
 
+  // Detect system theme if theme is 'system'
+  useEffect(() => {
+    if (!isInitialized) return;
+    if (theme !== 'system') return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const applySystemTheme = () => {
+      const root = document.documentElement;
+      const body = document.body;
+      root.classList.remove('light', 'dark');
+      body.classList.remove('light', 'dark');
+      if (mql.matches) {
+        root.classList.add('dark');
+        body.classList.add('dark');
+        root.style.colorScheme = 'dark';
+      } else {
+        root.classList.add('light');
+        body.classList.add('light');
+        root.style.colorScheme = 'light';
+      }
+    };
+    applySystemTheme();
+    mql.addEventListener('change', applySystemTheme);
+    return () => mql.removeEventListener('change', applySystemTheme);
+  }, [theme, isInitialized]);
+
   // Apply theme to document
   useEffect(() => {
     if (!isInitialized) return;
-    
+    if (theme === 'system') return; // handled above
     const root = document.documentElement;
     const body = document.body;
-    
-    // Remove existing theme classes
     root.classList.remove('light', 'dark');
     body.classList.remove('light', 'dark');
-    
-    // Apply new theme
     if (theme === 'dark') {
       root.classList.add('dark');
       body.classList.add('dark');
@@ -65,11 +86,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       root.classList.add('light');
       body.classList.add('light');
     }
-    
-    // Set color scheme
     root.style.colorScheme = theme;
-    
-    // Save to localStorage
     localStorage.setItem('theme', theme);
   }, [theme, isInitialized]);
 
