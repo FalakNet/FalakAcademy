@@ -1,6 +1,6 @@
 {
   "name": "Falak Academy",
-  "short_name": "Falak",
+  "short_name": "Academy",
   "description": "A modern learning platform.",
   "start_url": ".",
   "display": "standalone",
@@ -8,14 +8,14 @@
   "theme_color": "#2563eb",
   "icons": [
     {
-      "src": "/logo.svg",
+      "src": "/logo.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png"
     },
     {
-      "src": "/logo.svg",
+      "src": "/logo.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png"
     }
   ]
 }
