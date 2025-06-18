@@ -39,6 +39,10 @@ export default function Login() {
   const logoUrl = getAssetUrl(settings.site_logo_url);
   const splashImageUrl = getAssetUrl(settings.login_splash_image_url);
 
+  // Render logo with color based on theme
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const logoColor = isDark ? '#fff' : '#2563eb';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex">
       {/* Left Side - Branding & Features */}
@@ -65,6 +69,7 @@ export default function Login() {
                   src={logoUrl} 
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-4"
+                  style={{ filter: isDark ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
                 />
               ) : (
                 <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4">
@@ -152,6 +157,7 @@ export default function Login() {
                   src={logoUrl} 
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-3"
+                  style={{ filter: isDark ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
                 />
               ) : (
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mr-3">

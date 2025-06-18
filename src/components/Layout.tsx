@@ -96,6 +96,10 @@ export default function Layout({ children }: LayoutProps) {
 
   const logoUrl = getAssetUrl(settings.site_logo_url);
 
+  // Render logo with color based on theme
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const logoColor = isDark ? '#fff' : '#2563eb';
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Mobile overlay */}
@@ -119,6 +123,7 @@ export default function Layout({ children }: LayoutProps) {
                   src={logoUrl} 
                   alt={settings.site_name}
                   className="w-8 h-8 mr-3 object-contain"
+                  style={{ filter: isDark ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
                 />
               ) : (
                 <svg width="32" height="32" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-3">
@@ -237,6 +242,7 @@ export default function Layout({ children }: LayoutProps) {
                   src={logoUrl} 
                   alt={settings.site_name}
                   className="w-6 h-6 mr-2 object-contain"
+                  style={{ filter: isDark ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
                 />
               ) : (
                 <svg width="24" height="24" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">

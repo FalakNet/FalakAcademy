@@ -30,7 +30,7 @@ interface PlatformSettingsContextType {
 const defaultSettings: PlatformSettings = {
   site_name: 'Falak Academy',
   site_description: 'Professional Learning Management System',
-  site_logo_url: null,
+  site_logo_url: 'site_logo_url_1750248260516.svg',
   site_favicon_url: null,
   login_splash_image_url: null,
   primary_color: '#2563eb',
