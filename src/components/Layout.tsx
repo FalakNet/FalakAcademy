@@ -95,7 +95,7 @@ export default function Layout({ children }: LayoutProps) {
   const closeSidebar = () => setSidebarOpen(false);
 
   // Logo URL and color logic
-  const logoUrl = "https://ggcodscyfxihvbhsdgdu.supabase.co/storage/v1/object/public/platform-assets/site_logo_url_1750248260516.svg";
+  const logoUrl = getAssetUrl(settings.site_logo_url);
   function getThemeMode() {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
     if (stored === 'dark' || stored === 'light') return stored;

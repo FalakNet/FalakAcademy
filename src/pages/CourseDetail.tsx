@@ -41,7 +41,7 @@ export default function CourseDetail() {
   const [courseCompletion, setCourseCompletion] = useState<any>(null);
   const [certificate, setCertificate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar closed by default
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
@@ -500,23 +500,6 @@ export default function CourseDetail() {
     setExpandedSections(newExpanded);
   };
 
-  const getContentIcon = (type: string) => {
-    switch (type) {
-      case 'video':
-        return <Play className="w-4 h-4 text-red-500" />;
-      case 'image':
-        return <Image className="w-4 h-4 text-green-500" />;
-      case 'text':
-        return <FileText className="w-4 h-4 text-blue-500" />;
-      case 'quiz':
-        return <Brain className="w-4 h-4 text-purple-500" />;
-      case 'file':
-        return <File className="w-4 h-4 text-gray-500" />;
-      default:
-        return <FileText className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
   const renderContent = () => {
     if (!currentContent) {
       return (
@@ -828,6 +811,15 @@ export default function CourseDetail() {
   const publishedCompletedCount = allContent.filter(c => c.completed).length;
   const isFullyCompleted = publishedCompletedCount === allContent.length && allContent.length > 0;
 
+  // Handler for selecting content from sidebar
+  function handleSelectContent(content, isCompleted) {
+    setCurrentContent({
+      ...content,
+      completed: isCompleted,
+      completion: completions.get(content.id)
+    });
+  }
+
   return (
     <>
       <AlertModal
@@ -837,400 +829,283 @@ export default function CourseDetail() {
         message={alertModal.message}
         type={alertModal.type}
       />
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 relative">
+        {/* Sidebar overlay for mobile */}
+        {sidebarOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        )}
         {/* Sidebar */}
-        <div className={`${sidebarOpen ? 'w-60' : 'w-0'} transition-all duration-300 overflow-hidden bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col`}>
-          {/* Course Header */}
-          <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between mb-3">
-              <button
-                onClick={() => navigate('/my-courses')}
-                className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                Back to Courses
-              </button>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 lg:hidden"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">{course.title}</h1>
-            
-            {/* Course Completion Status */}
-            {courseCompletion && (
-              <div className="mb-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                <div className="flex items-center">
-                  <Trophy className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                  <div>
-                    <p className="text-sm font-medium text-green-800 dark:text-green-200">Course Completed!</p>
-                    <p className="text-xs text-green-600 dark:text-green-400">
-                      Completed on {new Date(courseCompletion.completed_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Progress - Now includes unpublished content */}
-            <div className="mb-3">
-              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
-                <span>Progress</span>
-                <span>{completedCount}/{totalContentCount} completed</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    isFullyCompleted ? 'bg-green-600' : 'bg-blue-600'
-                  }`}
-                  style={{ width: `${progressPercentage}%` }}
-                ></div>
-              </div>
-              {isFullyCompleted && !courseCompletion && (
-                <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
-                  🎉 All content completed! Ready to get your certificate.
-                </p>
-              )}
-              {totalContentCount > allContent.length}
-            </div>
+        <aside className={`fixed z-50 top-0 left-0 h-full w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:static lg:translate-x-0 lg:w-72`}>
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 lg:hidden">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">{course?.title}</h2>
+            <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <X className="w-6 h-6" />
+            </button>
           </div>
-
-          {/* Sections List */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="overflow-y-auto h-full pb-24 lg:pb-0">
             {sections.map((section) => (
-              <div key={section.id} className="border-b border-gray-100 dark:border-gray-700">
-                <button
-                  onClick={() => toggleSection(section.id)}
-                  className="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900 dark:text-white">{section.title}</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{section.content.length} items</p>
-                    </div>
-                    {expandedSections.has(section.id) ? (
-                      <ChevronDown className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    )}
-                  </div>
-                </button>
-
-                {expandedSections.has(section.id) && (
-                  <div className="pb-2">
-                    {section.content.map((content) => {
-                      const isCompleted = completions.has(content.id);
-                      const isCurrent = currentContent?.id === content.id;
-                      const isQuiz = content.content_type === 'quiz';
-                      const quizId = isQuiz ? content.content_data?.quiz_id : null;
-                      const attemptSummary = quizId ? quizAttempts.get(quizId) : null;
-                      
-                      return (
-                        <button
-                          key={content.id}
-                          onClick={() => setCurrentContent({
-                            ...content,
-                            completed: isCompleted,
-                            completion: completions.get(content.id)
-                          })}
-                          className={`w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-l-2 ${
-                            isCurrent 
-                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
-                              : 'border-transparent'
-                          }`}
-                        >
-                          <div className="flex items-center ml-4">
-                            {getContentIcon(content.content_type)}
-                            <div className="ml-3 flex-1">
-                              <div className="flex items-center justify-between">
-                                <h4 className={`text-sm font-medium ${
-                                  isCurrent ? 'text-blue-900 dark:text-blue-200' : 'text-gray-900 dark:text-white'
-                                }`}>
-                                  {content.title}
-                                </h4>
-                                <div className="flex items-center space-x-1">
-                                  {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
-                                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                                      attemptSummary.passed 
-                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                        : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-                                    }`}>
-                                      {attemptSummary.bestScore}%
-                                    </span>
-                                  )}
-                                  {isCompleted && (
-                                    <CheckCircle className="w-4 h-4 text-green-500" />
-                                  )}
-                                </div>
-                              </div>
-                              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                <span className="capitalize">{content.content_type}</span>
-                                {content.duration_minutes > 0 && (
-                                  <>
-                                    <span className="mx-1">•</span>
-                                    <Clock className="w-3 h-3 mr-1" />
-                                    <span>{content.duration_minutes} min</span>
-                                  </>
-                                )}
-                                {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
-                                  <>
-                                    <span className="mx-1">•</span>
-                                    <span>{attemptSummary.totalAttempts} attempt{attemptSummary.totalAttempts !== 1 ? 's' : ''}</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <SidebarSection
+                key={section.id}
+                section={section}
+                expanded={expandedSections.has(section.id)}
+                onToggle={() => toggleSection(section.id)}
+                onSelectContent={handleSelectContent}
+                currentContentId={currentContent?.id}
+                completions={completions}
+                quizAttempts={quizAttempts}
+              />
             ))}
           </div>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Top Bar */}
-          <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {!sidebarOpen && (
-                  <button
-                    onClick={() => setSidebarOpen(true)}
-                    className="mr-3 p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                  >
-                    <Menu className="w-5 h-5" />
-                  </button>
-                )}
-                
-                {currentContent && (
-                  <div className="flex items-center">
-                    {getContentIcon(currentContent.content_type)}
-                    <div className="ml-3">
-                      <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{currentContent.title}</h2>
-                      <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        <span className="capitalize">{currentContent.content_type}</span>
-                        {currentContent.duration_minutes > 0 && (
-                          <>
-                            <span className="mx-2">•</span>
-                            <Clock className="w-4 h-4 mr-1" />
-                            <span>{currentContent.duration_minutes} min</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-3">
-                {/* Complete Course Button */}
-                {isFullyCompleted && !courseCompletion && (
-                  <button
-                    onClick={() => setShowCompletionModal(true)}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-lg"
-                  >
-                    <Trophy className="w-4 h-4 mr-2" />
-                    Complete Course
-                    {course.enable_certificates && " & Get Certificate"}
-                  </button>
-                )}
-
-                {/* Mark Content Complete Button */}
-                {currentContent && !currentContent.completed && (() => {
-                  const { canComplete, reason } = canMarkContentComplete(currentContent);
-                  return (
-                    <div className="relative">
-                      <button
-                        onClick={() => canComplete ? markContentComplete(currentContent.id) : null}
-                        disabled={!canComplete}
-                        className={`inline-flex items-center px-4 py-2 rounded-lg transition-colors ${
-                          canComplete
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        }`}
-                        title={!canComplete ? reason : 'Mark as complete'}
-                      >
-                        {!canComplete && currentContent.content_type === 'quiz' && (
-                          <AlertCircle className="w-4 h-4 mr-2" />
-                        )}
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Mark Complete
-                      </button>
-                      {!canComplete && reason && (
-                        <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs rounded py-1 px-2 whitespace-nowrap">
-                          {reason}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-
-                {/* View Certificate Button */}
-                {courseCompletion && certificate && course.enable_certificates && (
-                  <button
-                    onClick={() => setShowCertificateModal(true)}
-                    className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-lg hover:from-yellow-600 hover:to-orange-600 transition-all duration-200"
-                  >
-                    <Award className="w-4 h-4 mr-2" />
-                    View Certificate
-                  </button>
-                )}
-              </div>
-            </div>
+        </aside>
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-w-0 h-full">
+          {/* Top bar for mobile */}
+          <div className="flex items-center justify-between bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 lg:hidden sticky top-0 z-30">
+            <button onClick={() => setSidebarOpen(true)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+              <Menu className="w-6 h-6" />
+            </button>
+            <h1 className="text-base font-bold text-gray-900 dark:text-white truncate">{course?.title}</h1>
+            <div className="w-6 h-6" />
           </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          {/* Main content area */}
+          <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-8 h-full w-full">
             {renderContent()}
           </div>
+          {/* Sticky bottom nav for mobile */}
+          <MobileNavBar
+            currentIndex={currentIndex}
+            allContent={allContent}
+            currentContent={currentContent}
+            canMarkContentComplete={canMarkContentComplete}
+            markContentComplete={markContentComplete}
+            navigateToContent={navigateToContent}
+          />
+        </div>
+      </div>
 
-          {/* Navigation Footer */}
-          <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => navigateToContent('prev')}
-                disabled={currentIndex <= 0}
-                className="inline-flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Previous
-              </button>
-
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                {currentIndex >= 0 && (
-                  <span>{currentIndex + 1} of {allContent.length}</span>
-                )}
+      {/* Course Completion Modal */}
+      {showCompletionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 w-full max-w-md mx-4">
+            <div className="text-center">
+              <div className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Trophy className="w-10 h-10 text-white" />
               </div>
+              
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+                🎉 Congratulations!
+              </h2>
+              
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                You have completed all the content in this course.
+                {course.enable_certificates ? " Are you ready to receive your certificate of completion?" : ""}
+              </p>
 
-              <button
-                onClick={() => navigateToContent('next')}
-                disabled={currentIndex >= allContent.length - 1}
-                className="inline-flex items-center px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </button>
+              {course.enable_certificates && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <Award className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Certificate Benefits</p>
+                      <ul className="text-sm text-blue-600 dark:text-blue-300 mt-1 space-y-1">
+                        <li>• Official completion certificate</li>
+                        <li>• Downloadable PDF format</li>
+                        <li>• Unique certificate number</li>
+                        <li>• Shareable achievement</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!course.enable_certificates && (
+                <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
+                  <div className="flex items-start">
+                    <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400 mt-0.5 mr-2" />
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200">No Certificate Available</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        This course does not issue certificates upon completion. Your progress and completion status will still be recorded.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowCompletionModal(false)}
+                  className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Not Yet
+                </button>
+                <button
+                  onClick={completeCourse}
+                  className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
+                >
+                  {course.enable_certificates ? "Get My Certificate!" : "Complete Course"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Course Completion Modal */}
-        {showCompletionModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-8 w-full max-w-md mx-4">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <Trophy className="w-10 h-10 text-white" />
-                </div>
-                
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                  🎉 Congratulations!
-                </h2>
-                
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  You have completed all the content in this course.
-                  {course.enable_certificates ? " Are you ready to receive your certificate of completion?" : ""}
+      {/* Certificate Modal */}
+      {showCertificateModal && certificate && course.enable_certificates && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Certificate</h2>
+                <button
+                  onClick={() => setShowCertificateModal(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <CertificateGenerator 
+                certificate={certificate} 
+                profile={profile!}
+                onDownload={() => {
+                  console.log('Certificate downloaded:', certificate.certificate_number);
+                }}
+              />
+              
+              <div className="mt-6 text-center">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  🎉 Congratulations on completing the course! Your certificate is ready for download.
                 </p>
-
-                {course.enable_certificates && (
-                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
-                    <div className="flex items-start">
-                      <Award className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 mr-2" />
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Certificate Benefits</p>
-                        <ul className="text-sm text-blue-600 dark:text-blue-300 mt-1 space-y-1">
-                          <li>• Official completion certificate</li>
-                          <li>• Downloadable PDF format</li>
-                          <li>• Unique certificate number</li>
-                          <li>• Shareable achievement</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {!course.enable_certificates && (
-                  <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
-                    <div className="flex items-start">
-                      <Shield className="w-5 h-5 text-gray-600 dark:text-gray-400 mt-0.5 mr-2" />
-                      <div className="text-left">
-                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">No Certificate Available</p>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          This course does not issue certificates upon completion. Your progress and completion status will still be recorded.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex space-x-3">
-                  <button
-                    onClick={() => setShowCompletionModal(false)}
-                    className="flex-1 px-4 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >
-                    Not Yet
-                  </button>
-                  <button
-                    onClick={completeCourse}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all duration-200"
-                  >
-                    {course.enable_certificates ? "Get My Certificate!" : "Complete Course"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Certificate Modal */}
-        {showCertificateModal && certificate && course.enable_certificates && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Your Certificate</h2>
-                  <button
-                    onClick={() => setShowCertificateModal(false)}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-                
-                <CertificateGenerator 
-                  certificate={certificate} 
-                  profile={profile!}
-                  onDownload={() => {
-                    console.log('Certificate downloaded:', certificate.certificate_number);
+                <button
+                  onClick={() => {
+                    setShowCertificateModal(false);
+                    navigate('/certificates');
                   }}
-                />
-                
-                <div className="mt-6 text-center">
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    🎉 Congratulations on completing the course! Your certificate is ready for download.
-                  </p>
-                  <button
-                    onClick={() => {
-                      setShowCertificateModal(false);
-                      navigate('/certificates');
-                    }}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    View All Certificates
-                  </button>
-                </div>
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  View All Certificates
+                </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
+}
+
+// --- Reusable SidebarSection component ---
+function SidebarSection({ section, expanded, onToggle, onSelectContent, currentContentId, completions, quizAttempts }) {
+  return (
+    <div className="border-b border-gray-100 dark:border-gray-700">
+      <button
+        onClick={onToggle}
+        className="w-full p-4 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <h3 className="font-medium text-gray-900 dark:text-white">{section.title}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{section.content.length} items</p>
+          </div>
+          {expanded ? (
+            <ChevronDown className="w-4 h-4 text-gray-400" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-gray-400" />
+          )}
+        </div>
+      </button>
+      {expanded && (
+        <div className="pb-2">
+          {section.content.map((content) => {
+            const isCompleted = completions.has(content.id);
+            const isCurrent = currentContentId === content.id;
+            const isQuiz = content.content_type === 'quiz';
+            const quizId = isQuiz ? content.content_data?.quiz_id : null;
+            const attemptSummary = quizId ? quizAttempts.get(quizId) : null;
+            return (
+              <button
+                key={content.id}
+                onClick={() => onSelectContent(content, isCompleted)}
+                className={`w-full p-3 text-left hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-l-2 ${isCurrent ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-transparent'}`}
+              >
+                <div className="flex items-center ml-4">
+                  {getContentIcon(content.content_type)}
+                  <div className="ml-3 flex-1">
+                    <div className="flex items-center justify-between">
+                      <h4 className={`text-sm font-medium ${isCurrent ? 'text-blue-900 dark:text-blue-200' : 'text-gray-900 dark:text-white'}`}>{content.title}</h4>
+                      <div className="flex items-center space-x-1">
+                        {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${attemptSummary.passed ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'}`}>{attemptSummary.bestScore}%</span>
+                        )}
+                        {isCompleted && <CheckCircle className="w-4 h-4 text-green-500" />}
+                      </div>
+                    </div>
+                    <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <span className="capitalize">{content.content_type}</span>
+                      {content.duration_minutes > 0 && (<><span className="mx-1">•</span><Clock className="w-3 h-3 mr-1" /><span>{content.duration_minutes} min</span></>)}
+                      {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (<><span className="mx-1">•</span><span>{attemptSummary.totalAttempts} attempt{attemptSummary.totalAttempts !== 1 ? 's' : ''}</span></>)}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- Reusable MobileNavBar component ---
+function MobileNavBar({ currentIndex, allContent, currentContent, canMarkContentComplete, markContentComplete, navigateToContent }) {
+  return (
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-2 py-2 space-x-2 shadow-lg">
+      <button
+        onClick={() => navigateToContent('prev')}
+        disabled={currentIndex <= 0}
+        className="flex-1 inline-flex items-center justify-center px-2 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+      >
+        <ArrowLeft className="w-4 h-4 mr-1" /> Prev
+      </button>
+      {currentContent && !currentContent.completed && (() => {
+        const { canComplete } = canMarkContentComplete(currentContent);
+        return (
+          <button
+            onClick={() => canComplete ? markContentComplete(currentContent.id) : null}
+            disabled={!canComplete}
+            className="flex-1 inline-flex items-center justify-center px-2 py-2 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <CheckCircle className="w-4 h-4 mr-1" /> Complete
+          </button>
+        );
+      })()}
+      <button
+        onClick={() => navigateToContent('next')}
+        disabled={currentIndex >= allContent.length - 1}
+        className="flex-1 inline-flex items-center justify-center px-2 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+      >
+        Next <ArrowRight className="w-4 h-4 ml-1" />
+      </button>
+    </div>
+  );
+}
+
+// Helper to get icon for content type
+function getContentIcon(type) {
+  switch (type) {
+    case 'video':
+      return <Play className="w-4 h-4 text-blue-500" />;
+    case 'file':
+      return <File className="w-4 h-4 text-gray-500" />;
+    case 'quiz':
+      return <Brain className="w-4 h-4 text-purple-500" />;
+    case 'image':
+      return <Image className="w-4 h-4 text-pink-500" />;
+    case 'markdown':
+      return <FileText className="w-4 h-4 text-green-500" />;
+    default:
+      return <FileText className="w-4 h-4 text-gray-400" />;
+  }
 }

@@ -11,6 +11,11 @@ interface SettingsModalProps {
 }
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+  // Ensure 'system' is the default theme in localStorage
+  if (typeof window !== 'undefined' && !localStorage.getItem('theme')) {
+    localStorage.setItem('theme', 'system');
+  }
+
   const {
     theme,
     colorBlindType,
@@ -30,6 +35,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const handleThemeChange = (newTheme: Theme) => {
     setTheme(newTheme);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('theme', newTheme);
+    }
+    // If system, apply system theme
+    if (newTheme === 'system' && typeof window !== 'undefined') {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.classList.toggle('dark', prefersDark);
+    }
   };
 
   const colorBlindOptions = [

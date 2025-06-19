@@ -52,6 +52,21 @@ export default function AdminSettings() {
     }
   }, [profile]);
 
+  // Sync draftSettings with loaded settings
+  useEffect(() => {
+    // Only update draftSettings if settings have changed (e.g., after load)
+    setDraftSettings(prev => {
+      const newDraft: Record<string, any> = { ...prev };
+      Object.keys(settings).forEach(key => {
+        // Only update if not already edited by user
+        if (!(key in prev)) {
+          newDraft[key] = settings[key]?.setting_value;
+        }
+      });
+      return newDraft;
+    });
+  }, [settings]);
+
   const loadSettings = async () => {
     try {
       setLoading(true);
@@ -120,6 +135,10 @@ export default function AdminSettings() {
           setting_value: value
         }
       }));
+      setDraftSettings(prev => ({
+        ...prev,
+        [key]: value
+      }));
     } catch (error) {
       console.error('Error updating setting:', error);
       throw error;
@@ -162,9 +181,11 @@ export default function AdminSettings() {
         .from('platform-assets')
         .getPublicUrl(uploadData.path);
 
-      // Update setting with new URL
-      await updateSetting(settingKey, urlData.publicUrl);
-
+      // Update draft setting with new URL (do not save yet)
+      setDraftSettings(prev => ({
+        ...prev,
+        [settingKey]: urlData.publicUrl
+      }));
     } catch (error) {
       console.error('Error uploading file:', error);
       showAlert('Upload Failed', 'Failed to upload file', 'error');
@@ -435,6 +456,11 @@ export default function AdminSettings() {
     { id: 'system', name: 'System', icon: Database }
   ];
 
+  // Only enable save if there are unsaved changes
+  const hasUnsavedChanges = Object.entries(draftSettings).some(
+    ([key, value]) => settings[key]?.setting_value !== value
+  );
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -445,7 +471,7 @@ export default function AdminSettings() {
         </div>
         <button
           onClick={saveAllSettings}
-          disabled={saveStatus === 'saving'}
+          disabled={saveStatus === 'saving' || !hasUnsavedChanges}
           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
         >
           <Save className="w-4 h-4 mr-2" />

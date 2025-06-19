@@ -37,7 +37,8 @@ export default function Login() {
   };
 
   // Always use the provided logo URL
-  const logoUrl = "https://ggcodscyfxihvbhsdgdu.supabase.co/storage/v1/object/public/platform-assets/site_logo_url_1750248260516.svg";
+  const logoUrl = getAssetUrl(settings.site_logo_url);
+  console.log('Logo URL:', logoUrl);
   const splashImageUrl = getAssetUrl(settings.login_splash_image_url);
 
   // Render logo with color based on theme

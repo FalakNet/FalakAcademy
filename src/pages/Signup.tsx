@@ -23,6 +23,9 @@ export default function Signup() {
   const { user, signUp } = useAuth();
   const { settings, getAssetUrl } = usePlatformSettings();
 
+  // Add splashImageUrl definition
+  const splashImageUrl = getAssetUrl(settings.login_splash_image_url);
+
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -86,7 +89,7 @@ export default function Signup() {
   ];
 
   // Logo URL and color logic
-  const logoUrl = "https://ggcodscyfxihvbhsdgdu.supabase.co/storage/v1/object/public/platform-assets/site_logo_url_1750248260516.svg";
+  const logoUrl = getAssetUrl(settings.site_logo_url);
   function getThemeMode() {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
     if (stored === 'dark' || stored === 'light') return stored;

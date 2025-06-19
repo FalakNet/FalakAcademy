@@ -28,7 +28,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   // Load settings from localStorage on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as Theme;
+    // Set default theme to 'system' if not set
+    const savedTheme = localStorage.getItem('theme');
+    if (!savedTheme) {
+      localStorage.setItem('theme', 'system');
+    }
     const savedColorBlind = localStorage.getItem('colorBlindType') as ColorBlindType;
     const savedHighContrast = localStorage.getItem('highContrast') === 'true';
     const savedReducedMotion = localStorage.getItem('reducedMotion') === 'true';
