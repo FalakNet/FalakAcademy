@@ -125,7 +125,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className="hidden lg:flex items-center">
               {logoUrl ? (
                 <img 
-                  src={logoUrl} 
+                  src="/ficon.svg" 
                   alt={settings.site_name}
                   className="w-8 h-8 mr-3 object-contain"
                   style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}

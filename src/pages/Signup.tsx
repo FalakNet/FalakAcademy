@@ -122,7 +122,7 @@ export default function Signup() {
             <div className="flex items-center mb-6">
               {logoUrl ? (
                 <img 
-                  src={logoUrl} 
+                  src="/ficon.svg" 
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-4"
                   style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
@@ -203,7 +203,7 @@ export default function Signup() {
             <div className="flex items-center justify-center mb-4">
               {logoUrl ? (
                 <img 
-                  src={logoUrl} 
+                  src="/ficon.svg"
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-3"
                   style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
