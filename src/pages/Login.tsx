@@ -38,12 +38,10 @@ export default function Login() {
 
   // Always use the provided logo URL
   const logoUrl = getAssetUrl(settings.site_logo_url);
-  console.log('Logo URL:', logoUrl);
   const splashImageUrl = getAssetUrl(settings.login_splash_image_url);
 
   // Render logo with color based on theme
   const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const logoColor = isDark ? '#fff' : '#2563eb';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex">
