@@ -11,7 +11,7 @@ export default defineConfig({
       includeAssets: ['favicon.svg', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
         name: 'Falak Academy',
-        short_name: 'Falak',
+        short_name: 'Academy',
         description: 'A modern learning platform',
         theme_color: '#2563eb',
         background_color: '#ffffff',
