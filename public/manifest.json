@@ -2,7 +2,7 @@
   "name": "Academy",
   "short_name": "Academy",
   "description": "A modern learning platform.",
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#733eec",
   "theme_color": "#733eec",
