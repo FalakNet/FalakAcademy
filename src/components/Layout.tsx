@@ -123,28 +123,12 @@ export default function Layout({ children }: LayoutProps) {
           {/* Header - Hide logo on mobile */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
             <div className="hidden lg:flex items-center">
-              {logoUrl ? (
                 <img 
                   src="/ficon.svg" 
                   alt={settings.site_name}
                   className="w-8 h-8 mr-3 object-contain"
                   style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
                 />
-              ) : (
-                <svg width="32" height="32" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-3">
-                  <g clipPath="url(#clip0_527_160)">
-                    <path d="M50 0H22.4756V11.3524H50V0Z" fill="#2563eb"/>
-                    <path d="M11.4446 0.488987L22.3685 11.4596V26.6248L11.4791 15.6888L11.4446 0.488987Z" fill="#2563eb"/>
-                    <path d="M0 5.22794L11.273 15.4953V27.4973L0.204714 16.3816L0 5.22794Z" fill="#2563eb"/>
-                    <path d="M22.1967 50H11.2729V27.4974H49.5V38.7478H22.1967V50Z" fill="#2563eb"/>
-                  </g>
-                  <defs>
-                    <clipPath id="clip0_527_160">
-                      <rect width="50" height="50" fill="white"/>
-                    </clipPath>
-                  </defs>
-                </svg>
-              )}
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">{settings.site_name}</h1>
             </div>
             <button
