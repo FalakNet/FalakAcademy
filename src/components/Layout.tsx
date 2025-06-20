@@ -9,7 +9,6 @@ import {
   LogOut, 
   Home,
   FileText,
-  Brain,
   Award,
   Shield,
   Crown,
@@ -49,7 +48,6 @@ export default function Layout({ children }: LayoutProps) {
         { path: '/dashboard', icon: Home, label: 'Dashboard' },
         { path: '/admin/users', icon: Users, label: 'User Management' },
         { path: '/admin/courses', icon: BookOpen, label: 'Course Management' },
-        { path: '/admin/quizzes', icon: Brain, label: 'Quizzes' },
         { path: '/admin/settings', icon: Settings, label: 'System Settings' }
       ];
     } else if (isAdmin()) {
@@ -57,7 +55,6 @@ export default function Layout({ children }: LayoutProps) {
       return [
         { path: '/dashboard', icon: Home, label: 'Dashboard' },
         { path: '/admin/courses', icon: BookOpen, label: 'Course Management' },
-        { path: '/admin/quizzes', icon: Brain, label: 'Quizzes' }
       ];
     } else {
       // Regular users get standard student navigation
@@ -103,7 +100,6 @@ export default function Layout({ children }: LayoutProps) {
     return 'light';
   }
   const themeMode = getThemeMode();
-  const logoColor = themeMode === 'dark' ? '#fff' : '#2563eb';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

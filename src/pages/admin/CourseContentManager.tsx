@@ -7,6 +7,7 @@ import {
   Play, Image, FileText, Brain, File, Eye, 
   X} from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import QuizManager from '../../components/admin/QuizManager';
 
 // --- TypeScript Fixes: Extend types locally for UI logic ---
 
@@ -646,28 +647,20 @@ export default function CourseContentManager() {
                 placeholder="Instructions for the quiz..."
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Passing Score (%)</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={contentData.passingScore || 70}
-                onChange={(e) => updateContentData('passingScore', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <Brain className="w-5 h-5 text-blue-600 mt-0.5 mr-2" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Quiz Integration</p>
-                  <p className="text-sm text-blue-600 mt-1">
-                    When you create this quiz content, it will automatically appear in the Quiz Management section where you can add questions and configure settings.
-                  </p>
-                </div>
+            {/* Inline QuizManager for editing existing quiz */}
+            {isEditing && content.content_data?.quiz_id && (
+              <div className="mt-6 space-y-4">
+                <QuizManager quizId={content.content_data.quiz_id} />
+                <a
+                  href={`/admin/quiz-analytics/${content.content_data.quiz_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg shadow hover:bg-blue-200 dark:hover:bg-blue-800 transition font-semibold"
+                >
+                  View Full Analytics
+                </a>
               </div>
-            </div>
+            )}
           </div>
         );
 
@@ -829,7 +822,13 @@ export default function CourseContentManager() {
                                             </svg>
                                           </span>
                                           {getContentIcon(content.content_type)}
-                                          <span className="font-medium text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition">{content.title}</span>
+                                          <span
+                                            className="font-medium text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition cursor-pointer hover:underline"
+                                            onClick={() => setEditingContent(content)}
+                                            title="Edit Content"
+                                          >
+                                            {content.title}
+                                          </span>
                                           <span className="ml-2 relative group">
                                             <span
                                               className={`inline-block w-2 h-2 rounded-full align-middle ${
