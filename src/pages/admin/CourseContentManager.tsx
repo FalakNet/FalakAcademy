@@ -4,26 +4,63 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase, Course, CourseSection, SectionContent, ContentType } from '../../lib/supabase';
 import { 
   BookOpen, Plus, Edit2, Trash2, ChevronDown, ChevronRight, 
-  Play, Image, FileText, Brain, File, Eye, EyeOff, 
-  ArrowUp, ArrowDown, Save, X, BarChart3
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+  Play, Image, FileText, Brain, File, Eye, 
+  X} from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+
+// --- TypeScript Fixes: Extend types locally for UI logic ---
+
+type UICourseSection = CourseSection & { published_at?: string | null };
+type UISectionContent = SectionContent & {
+  content_data: {
+    text?: string;
+    url?: string;
+    description?: string;
+    transcript?: string;
+    alt?: string;
+    caption?: string;
+    filename?: string;
+    instructions?: string;
+    passingScore?: number;
+    quiz_id?: string;
+    embedUrl?: string;
+    originalUrl?: string;
+    [key: string]: any;
+  };
+};
+
+type NewSectionState = {
+  title: string;
+  description: string;
+  order_index: number;
+  is_published: boolean;
+  published_at: string;
+};
+
+type NewContentState = {
+  title: string;
+  content_type: ContentType;
+  content_data: UISectionContent['content_data'];
+  order_index: number;
+  duration_minutes: number;
+  is_published: boolean;
+};
 
 export default function CourseContentManager() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const { profile, isAdmin } = useAuth();
   const [course, setCourse] = useState<Course | null>(null);
-  const [sections, setSections] = useState<(CourseSection & { content: SectionContent[] })[]>([]);
+  const [sections, setSections] = useState<(UICourseSection & { content: UISectionContent[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [showSectionModal, setShowSectionModal] = useState(false);
   const [showContentModal, setShowContentModal] = useState(false);
-  const [editingSection, setEditingSection] = useState<CourseSection | null>(null);
-  const [editingContent, setEditingContent] = useState<SectionContent | null>(null);
+  const [editingSection, setEditingSection] = useState<UICourseSection | null>(null);
+  const [editingContent, setEditingContent] = useState<UISectionContent | null>(null);
   const [selectedSectionId, setSelectedSectionId] = useState<string>('');
   
-  const [newSection, setNewSection] = useState({
+  const [newSection, setNewSection] = useState<NewSectionState>({
     title: '',
     description: '',
     order_index: 0,
@@ -31,7 +68,7 @@ export default function CourseContentManager() {
     published_at: '' // Add published_at field
   });
 
-  const [newContent, setNewContent] = useState({
+  const [newContent, setNewContent] = useState<NewContentState>({
     title: '',
     content_type: 'text' as ContentType,
     content_data: {},
@@ -45,6 +82,19 @@ export default function CourseContentManager() {
       loadCourseData();
     }
   }, [courseId, profile]);
+
+  // Expand last section by default when sections change
+  useEffect(() => {
+    if (sections.length > 0) {
+      setExpandedSections((prev) => {
+        // If already expanded, don't collapse others
+        if (prev.size === 0 || !prev.has(sections[sections.length - 1].id)) {
+          return new Set([sections[sections.length - 1].id]);
+        }
+        return prev;
+      });
+    }
+  }, [sections]);
 
   const loadCourseData = async () => {
     if (!courseId) return;
@@ -626,6 +676,45 @@ export default function CourseContentManager() {
     }
   };
 
+  // Handler for drag end
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    // Reorder sections
+    if (result.type === 'section') {
+      const reordered = Array.from(sections);
+      const [removed] = reordered.splice(result.source.index, 1);
+      reordered.splice(result.destination.index, 0, removed);
+      // Update order_index locally
+      setSections(reordered.map((s, idx) => ({ ...s, order_index: idx })));
+      // Update order_index in DB
+      for (let i = 0; i < reordered.length; i++) {
+        await supabase.from('course_sections').update({ order_index: i }).eq('id', reordered[i].id);
+      }
+      await loadCourseData();
+    }
+    // Reorder content within a section
+    if (result.type === 'content') {
+      const sectionIdx = sections.findIndex(s => s.id === result.source.droppableId);
+      if (sectionIdx === -1) return;
+      const section = sections[sectionIdx];
+      const reorderedContent = Array.from(section.content);
+      const [removed] = reorderedContent.splice(result.source.index, 1);
+      reorderedContent.splice(result.destination.index, 0, removed);
+      // Update order_index locally
+      const updatedSections = [...sections];
+      updatedSections[sectionIdx] = {
+        ...section,
+        content: reorderedContent.map((c, idx) => ({ ...c, order_index: idx }))
+      };
+      setSections(updatedSections);
+      // Update order_index in DB
+      for (let i = 0; i < reorderedContent.length; i++) {
+        await supabase.from('section_content').update({ order_index: i }).eq('id', reorderedContent[i].id);
+      }
+      await loadCourseData();
+    }
+  };
+
   if (!isAdmin()) {
     return (
       <div className="text-center py-12">
@@ -655,25 +744,23 @@ export default function CourseContentManager() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10 max-w-5xl mx-auto px-2 md:px-0">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 md:gap-0 pb-2 border-b border-gray-200 dark:border-gray-700">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Course Content Manager</h1>
-          <p className="mt-2 text-gray-600">
-            Manage sections and content for "{course.title}"
-          </p>
+          <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">Course Content Manager</h1>
+          <p className="mt-1 text-gray-500 dark:text-gray-400 text-base">Manage sections and content for <span className="font-semibold text-blue-700 dark:text-blue-300">"{course.title}"</span></p>
         </div>
-        <div className="flex space-x-3">
+        <div className="flex space-x-2">
           <button
             onClick={() => navigate('/admin/courses')}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+            className="px-4 py-2 text-gray-600 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 shadow-sm transition"
           >
             Back to Courses
           </button>
           <button
             onClick={() => setShowSectionModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 dark:from-blue-700 dark:to-blue-600 text-white rounded-lg shadow hover:from-blue-700 hover:to-blue-600 dark:hover:from-blue-800 dark:hover:to-blue-700 transition"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Section
@@ -682,206 +769,166 @@ export default function CourseContentManager() {
       </div>
 
       {/* Sections List */}
-      <div className="space-y-4">
-        {sections.map((section) => (
-          <div key={section.id} className="bg-white rounded-lg shadow-sm border border-gray-200">
-            {/* Section Header */}
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <button
-                    onClick={() => toggleSection(section.id)}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    {expandedSections.has(section.id) ? (
-                      <ChevronDown className="w-5 h-5" />
-                    ) : (
-                      <ChevronRight className="w-5 h-5" />
-                    )}
-                  </button>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
-                    <p className="text-sm text-gray-600">{section.description}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    section.is_published 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-orange-100 text-orange-800'
-                  }`}>
-                    {section.is_published ? 'Published' : 'Draft'}
-                  </span>
-                  <button
-                    onClick={() => {
-                      setSelectedSectionId(section.id);
-                      setShowContentModal(true);
-                    }}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => setEditingSection(section)}
-                    className="text-gray-600 hover:text-gray-800"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => deleteSection(section.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Section Content */}
-            {expandedSections.has(section.id) && (
-              <div className="p-4">
-                {section.content.length > 0 ? (
-                  <div className="space-y-3">
-                    {section.content.map((content) => (
-                      <div key={content.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          {getContentIcon(content.content_type)}
-                          <div>
-                            <h4 className="font-medium text-gray-900">{content.title}</h4>
-                            <div className="flex items-center space-x-2 text-sm text-gray-500">
-                              <span className="capitalize">{content.content_type}</span>
-                              {content.duration_minutes > 0 && (
-                                <span>• {content.duration_minutes} min</span>
-                              )}
-                              {content.content_type === 'video' && content.content_data?.url && (
-                                <span className="text-red-600">• Embedded Video</span>
-                              )}
-                              {content.content_type === 'quiz' && content.content_data?.quiz_id && (
-                                <span className="text-purple-600">• Quiz ID: {content.content_data.quiz_id.slice(0, 8)}...</span>
-                              )}
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                content.is_published 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-orange-100 text-orange-800'
-                              }`}>
-                                {content.is_published ? 'Published' : 'Draft'}
-                              </span>
-                            </div>
-                          </div>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="sections" type="section">
+          {(provided) => (
+            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-8">
+              {sections.map((section, sectionIdx) => (
+                <Draggable key={section.id} draggableId={section.id} index={sectionIdx}>
+                  {(sectionProvided) => (
+                    <div ref={sectionProvided.innerRef} {...sectionProvided.draggableProps} className="bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 transition hover:shadow-xl dark:hover:shadow-2xl">
+                      <div className="flex items-center justify-between px-6 py-4 cursor-pointer group rounded-t-2xl">
+                        <div className="flex items-center gap-3 flex-1 select-none" onClick={() => toggleSection(section.id)}>
+                          <span className="font-bold text-lg text-gray-900 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition">{section.title}</span>
+                          <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full px-2 py-0.5 font-semibold">{section.content.length} items</span>
+                          <span className="ml-2 relative group">
+                            <span
+                              className={`inline-block w-2 h-2 rounded-full align-middle ${
+                                section.is_published
+                                  ? 'bg-green-500'
+                                  : 'bg-yellow-400 dark:bg-yellow-600'
+                              }`}
+                              aria-label={section.is_published ? 'Published' : 'Draft'}
+                            />
+                            <span className="absolute left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs rounded bg-gray-800 text-white opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition whitespace-nowrap">
+                              {section.is_published ? 'Published' : 'Draft'}
+                            </span>
+                          </span>
                         </div>
-                        <div className="flex items-center space-x-2">
-                          {/* Quiz Analytics Button */}
-                          {content.content_type === 'quiz' && content.content_data?.quiz_id && (
-                            <Link
-                              to={`/admin/quiz-analytics/${content.content_data.quiz_id}`}
-                              className="text-purple-600 hover:text-purple-800"
-                              title="View Quiz Analytics"
-                            >
-                              <BarChart3 className="w-4 h-4" />
-                            </Link>
-                          )}
-                          <button
-                            onClick={() => setEditingContent(content)}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => deleteContent(content.id)}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 className="w-4 h-4" />
+                        <div className="flex items-center gap-2">
+                          <button onClick={() => setEditingSection(section)} className="p-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 transition" title="Edit Section"><Edit2 className="w-4 h-4" /></button>
+                          <button onClick={() => deleteSection(section.id)} className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900 text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 transition" title="Delete Section"><Trash2 className="w-4 h-4" /></button>
+                          <button onClick={() => { setShowContentModal(true); setSelectedSectionId(section.id); }} className="p-2 rounded-full hover:bg-green-50 dark:hover:bg-green-900 text-green-600 dark:text-green-300 hover:text-green-800 dark:hover:text-green-200 transition" title="Add Content"><Plus className="w-4 h-4" /></button>
+                          <button onClick={() => toggleSection(section.id)} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition" title="Expand/Collapse">
+                            {expandedSections.has(section.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                           </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>No content in this section yet.</p>
-                    <button
-                      onClick={() => {
-                        setSelectedSectionId(section.id);
-                        setShowContentModal(true);
-                      }}
-                      className="mt-2 text-blue-600 hover:text-blue-800"
-                    >
-                      Add your first content item
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+                      {expandedSections.has(section.id) && (
+                        <Droppable droppableId={section.id} type="content">
+                          {(contentProvided) => (
+                            <div ref={contentProvided.innerRef} {...contentProvided.droppableProps} className="px-6 pb-6 pt-2">
+                              {section.content.length === 0 && (
+                                <div className="text-gray-400 dark:text-gray-500 text-sm py-6 text-center">No content yet. Add content to this section.</div>
+                              )}
+                              <div className="space-y-3">
+                                {section.content.map((content, contentIdx) => (
+                                  <Draggable key={content.id} draggableId={content.id} index={contentIdx}>
+                                    {(contentDraggableProvided) => (
+                                      <div ref={contentDraggableProvided.innerRef} {...contentDraggableProvided.draggableProps} className="flex items-center justify-between bg-white dark:bg-gray-900 rounded-xl p-3 border border-gray-100 dark:border-gray-700 shadow-sm hover:shadow-md dark:hover:shadow-lg transition group">
+                                        <div className="flex items-center gap-3">
+                                          <span {...contentDraggableProvided.dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Drag to reorder">
+                                            {/* Braille 6-dot icon, now with a blue accent on hover */}
+                                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                              <circle cx="5" cy="4" r="1.5" fill="#A3A3A3" className="group-hover:fill-blue-400 dark:group-hover:fill-blue-300 transition" />
+                                              <circle cx="5" cy="9" r="1.5" fill="#A3A3A3" className="group-hover:fill-blue-400 dark:group-hover:fill-blue-300 transition" />
+                                              <circle cx="5" cy="14" r="1.5" fill="#A3A3A3" className="group-hover:fill-blue-400 dark:group-hover:fill-blue-300 transition" />
+                                              <circle cx="13" cy="4" r="1.5" fill="#A3A3A3" className="group-hover:fill-blue-400 dark:group-hover:fill-blue-300 transition" />
+                                              <circle cx="13" cy="9" r="1.5" fill="#A3A3A3" className="group-hover:fill-blue-400 dark:group-hover:fill-blue-300 transition" />
+                                              <circle cx="13" cy="14" r="1.5" fill="#A3A3A3" className="group-hover:fill-blue-400 dark:group-hover:fill-blue-300 transition" />
+                                            </svg>
+                                          </span>
+                                          {getContentIcon(content.content_type)}
+                                          <span className="font-medium text-gray-800 dark:text-gray-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition">{content.title}</span>
+                                          <span className="ml-2 relative group">
+                                            <span
+                                              className={`inline-block w-2 h-2 rounded-full align-middle ${
+                                                content.is_published
+                                                  ? 'bg-green-500'
+                                                  : 'bg-yellow-400 dark:bg-yellow-600'
+                                              }`}
+                                              aria-label={content.is_published ? 'Published' : 'Draft'}
+                                            />
+                                            <span className="absolute left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs rounded bg-gray-800 text-white opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition whitespace-nowrap">
+                                              {content.is_published ? 'Published' : 'Draft'}
+                                            </span>
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <button onClick={() => setEditingContent(content)} className="p-2 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900 text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 transition" title="Edit Content"><Edit2 className="w-4 h-4" /></button>
+                                          <button onClick={() => deleteContent(content.id)} className="p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900 text-red-600 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 transition" title="Delete Content"><Trash2 className="w-4 h-4" /></button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </Draggable>
+                                ))}
+                              </div>
+                              {contentProvided.placeholder}
+                            </div>
+                          )}
+                        </Droppable>
+                      )}
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </DragDropContext>
 
       {sections.length === 0 && (
-        <div className="text-center py-12">
-          <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">No sections yet</h2>
-          <p className="text-gray-600">Create your first section to start organizing your course content.</p>
+        <div className="text-center py-16">
+          <BookOpen className="w-16 h-16 text-gray-200 dark:text-gray-700 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No sections yet</h2>
+          <p className="text-gray-500 dark:text-gray-400">Create your first section to start organizing your course content.</p>
         </div>
       )}
 
       {/* Add Section Modal */}
       {showSectionModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add New Section</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-40 dark:bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 w-full max-w-md relative animate-fadeIn border border-gray-100 dark:border-gray-700">
+            <button onClick={() => setShowSectionModal(false)} className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition" title="Close"><X className="w-5 h-5" /></button>
+            <h3 className="text-xl font-bold mb-6 text-blue-700 dark:text-blue-300">Add New Section</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Section Title</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Section Title</label>
                 <input
                   type="text"
                   value={newSection.title}
                   onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                   placeholder="e.g., Day 1: Introduction"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Description</label>
                 <textarea
                   value={newSection.description}
                   onChange={(e) => setNewSection({ ...newSection, description: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                   placeholder="Brief description of this section..."
                 />
               </div>
-              
-              {/* Publishing Checkbox */}
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="section_published"
                   checked={newSection.is_published}
                   onChange={(e) => setNewSection({ ...newSection, is_published: e.target.checked })}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="section_published" className="ml-2 text-sm text-gray-700">
+                <label htmlFor="section_published" className="ml-2 text-sm text-gray-700 dark:text-gray-200">
                   Publish this section immediately
                 </label>
               </div>
-
-              {/* Publishing DateTime Picker */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Publish Date & Time</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Publish Date & Time</label>
                 <input
                   type="datetime-local"
                   value={newSection.published_at}
                   onChange={(e) => setNewSection({ ...newSection, published_at: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                 />
-                <p className="text-xs text-gray-500 mt-1">Leave blank to keep as draft or publish immediately.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Leave blank to keep as draft or publish immediately.</p>
               </div>
-              
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                 <div className="flex items-start">
-                  <Eye className="w-4 h-4 text-gray-500 mt-0.5 mr-2" />
-                  <div className="text-xs text-gray-600">
+                  <Eye className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-0.5 mr-2" />
+                  <div className="text-xs text-gray-600 dark:text-gray-300">
                     <p className="font-medium mb-1">Publishing Options:</p>
                     <ul className="space-y-1">
                       <li>• <strong>Published:</strong> Visible to enrolled students immediately</li>
@@ -892,16 +939,16 @@ export default function CourseContentManager() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-end space-x-3 mt-8">
               <button
                 onClick={() => setShowSectionModal(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
               >
                 Cancel
               </button>
               <button
                 onClick={createSection}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 shadow"
               >
                 Add Section
               </button>
@@ -912,26 +959,38 @@ export default function CourseContentManager() {
 
       {/* Add Content Modal */}
       {showContentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Add New Content</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-40 dark:bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 w-full max-w-2xl max-h-[80vh] overflow-y-auto relative animate-fadeIn border border-gray-100 dark:border-gray-700">
+            <button onClick={() => {
+              setShowContentModal(false);
+              setSelectedSectionId('');
+              setNewContent({
+                title: '',
+                content_type: 'text',
+                content_data: {},
+                order_index: 0,
+                duration_minutes: 0,
+                is_published: false
+              });
+            }} className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition" title="Close"><X className="w-5 h-5" /></button>
+            <h3 className="text-xl font-bold mb-6 text-blue-700 dark:text-blue-300">Add New Content</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Content Title</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Content Title</label>
                 <input
                   type="text"
                   value={newContent.title}
                   onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                   placeholder="e.g., Introduction Video"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Content Type</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Content Type</label>
                 <select
                   value={newContent.content_type}
                   onChange={(e) => setNewContent({ ...newContent, content_type: e.target.value as ContentType, content_data: {} })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                 >
                   <option value="text">Text Content</option>
                   <option value="video">Video (Embedded)</option>
@@ -940,39 +999,34 @@ export default function CourseContentManager() {
                   <option value="quiz">Quiz</option>
                 </select>
               </div>
-              
               {renderContentForm(newContent)}
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Duration (minutes)</label>
                 <input
                   type="number"
                   min="0"
                   value={newContent.duration_minutes}
                   onChange={(e) => setNewContent({ ...newContent, duration_minutes: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                   placeholder="Estimated time to complete"
                 />
               </div>
-
-              {/* Publishing Checkbox for Content */}
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="content_published"
                   checked={newContent.is_published}
                   onChange={(e) => setNewContent({ ...newContent, is_published: e.target.checked })}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="content_published" className="ml-2 text-sm text-gray-700">
+                <label htmlFor="content_published" className="ml-2 text-sm text-gray-700 dark:text-gray-200">
                   Publish this content immediately
                 </label>
               </div>
-
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                 <div className="flex items-start">
-                  <Eye className="w-4 h-4 text-gray-500 mt-0.5 mr-2" />
-                  <div className="text-xs text-gray-600">
+                  <Eye className="w-4 h-4 text-gray-400 dark:text-gray-500 mt-0.5 mr-2" />
+                  <div className="text-xs text-gray-600 dark:text-gray-300">
                     <p className="font-medium mb-1">Content Publishing:</p>
                     <ul className="space-y-1">
                       <li>• <strong>Published:</strong> Students can view and interact with this content</li>
@@ -983,7 +1037,7 @@ export default function CourseContentManager() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-end space-x-3 mt-8">
               <button
                 onClick={() => {
                   setShowContentModal(false);
@@ -997,13 +1051,13 @@ export default function CourseContentManager() {
                     is_published: false
                   });
                 }}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
               >
                 Cancel
               </button>
               <button
                 onClick={createContent}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 shadow"
               >
                 Add Content
               </button>
@@ -1014,26 +1068,27 @@ export default function CourseContentManager() {
 
       {/* Edit Section Modal */}
       {editingSection && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Edit Section</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-40 dark:bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 w-full max-w-md relative animate-fadeIn border border-gray-100 dark:border-gray-700">
+            <button onClick={() => setEditingSection(null)} className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition" title="Close"><X className="w-5 h-5" /></button>
+            <h3 className="text-xl font-bold mb-6 text-blue-700 dark:text-blue-300">Edit Section</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Section Title</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Section Title</label>
                 <input
                   type="text"
                   value={editingSection.title}
                   onChange={(e) => setEditingSection({ ...editingSection, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Description</label>
                 <textarea
                   value={editingSection.description || ''}
                   onChange={(e) => setEditingSection({ ...editingSection, description: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
               <div className="flex items-center">
@@ -1042,35 +1097,33 @@ export default function CourseContentManager() {
                   id="edit_section_published"
                   checked={editingSection.is_published}
                   onChange={(e) => setEditingSection({ ...editingSection, is_published: e.target.checked })}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="edit_section_published" className="ml-2 text-sm text-gray-700">
+                <label htmlFor="edit_section_published" className="ml-2 text-sm text-gray-700 dark:text-gray-200">
                   Publish this section
                 </label>
               </div>
-
-              {/* Publish DateTime Picker */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Publish Date & Time</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Publish Date & Time</label>
                 <input
                   type="datetime-local"
                   value={editingSection.published_at ? editingSection.published_at.substring(0, 16) : ''}
                   onChange={(e) => setEditingSection({ ...editingSection, published_at: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                 />
-                <p className="text-xs text-gray-500 mt-1">Leave blank to keep as draft or publish immediately.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Leave blank to keep as draft or publish immediately.</p>
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-end space-x-3 mt-8">
               <button
                 onClick={() => setEditingSection(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
               >
                 Cancel
               </button>
               <button
                 onClick={updateSection}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 shadow"
               >
                 Update Section
               </button>
@@ -1081,56 +1134,56 @@ export default function CourseContentManager() {
 
       {/* Edit Content Modal */}
       {editingContent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Edit Content</h3>
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-40 dark:bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-8 w-full max-w-2xl max-h-[80vh] overflow-y-auto relative animate-fadeIn border border-gray-100 dark:border-gray-700">
+            <button onClick={() => setEditingContent(null)} className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition" title="Close"><X className="w-5 h-5" /></button>
+            <h3 className="text-xl font-bold mb-6 text-blue-700 dark:text-blue-300">Edit Content</h3>
+            <div className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Content Title</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Content Title</label>
                 <input
                   type="text"
                   value={editingContent.title}
                   onChange={(e) => setEditingContent({ ...editingContent, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
               
               {renderContentForm(editingContent, true)}
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Duration (minutes)</label>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-200 mb-1">Duration (minutes)</label>
                 <input
                   type="number"
                   min="0"
                   value={editingContent.duration_minutes || 0}
                   onChange={(e) => setEditingContent({ ...editingContent, duration_minutes: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
-
               <div className="flex items-center">
                 <input
                   type="checkbox"
                   id="edit_content_published"
                   checked={editingContent.is_published}
                   onChange={(e) => setEditingContent({ ...editingContent, is_published: e.target.checked })}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded"
                 />
-                <label htmlFor="edit_content_published" className="ml-2 text-sm text-gray-700">
+                <label htmlFor="edit_content_published" className="ml-2 text-sm text-gray-700 dark:text-gray-200">
                   Publish this content
                 </label>
               </div>
             </div>
-            <div className="flex justify-end space-x-3 mt-6">
+            <div className="flex justify-end space-x-3 mt-8">
               <button
                 onClick={() => setEditingContent(null)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
               >
                 Cancel
               </button>
               <button
                 onClick={updateContent}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 shadow"
               >
                 Update Content
               </button>
