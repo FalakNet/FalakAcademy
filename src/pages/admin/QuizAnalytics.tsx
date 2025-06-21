@@ -4,8 +4,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase, Quiz, Question, QuizAttempt, Profile } from '../../lib/supabase';
 import { 
   Brain, ArrowLeft, Users, TrendingUp, Clock, Award, 
-  Download, Filter, Search, ChevronDown, ChevronUp,
-  CheckCircle, XCircle, BarChart3, PieChart, Calendar
+  Download, Search, 
+  CheckCircle, XCircle, BarChart3, 
 } from 'lucide-react';
 import AlertModal from '../../components/AlertModal';
 
@@ -57,6 +57,31 @@ export default function QuizAnalytics() {
     type: 'info',
   });
 
+  // --- Fetch passingScore from section_content for this quiz ---
+  const [passingScore, setPassingScore] = useState<number>(70); // default 70
+  const [gradingDisabled, setGradingDisabled] = useState<boolean>(false);
+
+  useEffect(() => {
+    async function fetchPassingScore() {
+      if (!quizId) return;
+      const { data, error } = await supabase
+        .from('section_content')
+        .select('content_data')
+        .eq('content_type', 'quiz')
+        .contains('content_data', { quiz_id: quizId })
+        .maybeSingle();
+      if (data && data.content_data) {
+        const score = typeof data.content_data.passingScore === 'number' ? data.content_data.passingScore : 70;
+        setPassingScore(score);
+        setGradingDisabled(score === 0);
+      } else {
+        setPassingScore(70);
+        setGradingDisabled(false);
+      }
+    }
+    fetchPassingScore();
+  }, [quizId]);
+
   useEffect(() => {
     if (quizId && isAdmin()) {
       loadQuizAnalytics();
@@ -84,7 +109,8 @@ export default function QuizAnalytics() {
     const uniqueUsers = new Set(attemptsData.map(a => a.user_id)).size;
     const scores = attemptsData.map(a => (a.score / a.max_score) * 100);
     const averageScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-    const passedAttempts = scores.filter(score => score >= 70).length;
+    // Use passingScore for pass/fail
+    const passedAttempts = gradingDisabled ? attemptsData.length : scores.filter(score => score >= passingScore).length;
     const passRate = (passedAttempts / totalAttempts) * 100;
 
     // Calculate time spent (in minutes)
@@ -111,7 +137,7 @@ export default function QuizAnalytics() {
         userBestScores.set(userId, score);
       }
     });
-    const usersPassed = Array.from(userBestScores.values()).filter(score => score >= 70).length;
+    const usersPassed = gradingDisabled ? userBestScores.size : Array.from(userBestScores.values()).filter(score => score >= passingScore).length;
     const userPassRate = (usersPassed / uniqueUsers) * 100;
 
     setStats({
@@ -288,7 +314,7 @@ export default function QuizAnalytics() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -351,7 +377,9 @@ export default function QuizAnalytics() {
               <Award className="h-8 w-8 text-yellow-600" />
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Pass Rate</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.passRate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {gradingDisabled ? 'Grading Disabled' : `${stats.passRate.toFixed(1)}%`}
+                </p>
               </div>
             </div>
           </div>
@@ -428,28 +456,32 @@ export default function QuizAnalytics() {
           {/* Score Distribution */}
           <div className="bg-white p-6 rounded-lg shadow-sm border">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Score Distribution</h3>
-            <div className="space-y-3">
-              {[
-                { range: '90-100%', color: 'bg-green-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 90).length },
-                { range: '80-89%', color: 'bg-blue-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 80 && (a.score / a.max_score) * 100 < 90).length },
-                { range: '70-79%', color: 'bg-yellow-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 70 && (a.score / a.max_score) * 100 < 80).length },
-                { range: '60-69%', color: 'bg-orange-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 60 && (a.score / a.max_score) * 100 < 70).length },
-                { range: 'Below 60%', color: 'bg-red-500', count: attempts.filter(a => (a.score / a.max_score) * 100 < 60).length }
-              ].map((item) => (
-                <div key={item.range} className="flex items-center">
-                  <div className="w-20 text-sm text-gray-600">{item.range}</div>
-                  <div className="flex-1 mx-4">
-                    <div className="bg-gray-200 rounded-full h-4">
-                      <div
-                        className={`${item.color} h-4 rounded-full`}
-                        style={{ width: `${attempts.length > 0 ? (item.count / attempts.length) * 100 : 0}%` }}
-                      ></div>
+            {gradingDisabled ? (
+              <div className="text-gray-500 text-sm">Score distribution is not available when grading is disabled.</div>
+            ) : (
+              <div className="space-y-3">
+                {[
+                  { range: '90-100%', color: 'bg-green-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 90).length },
+                  { range: '80-89%', color: 'bg-blue-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 80 && (a.score / a.max_score) * 100 < 90).length },
+                  { range: '70-79%', color: 'bg-yellow-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 70 && (a.score / a.max_score) * 100 < 80).length },
+                  { range: '60-69%', color: 'bg-orange-500', count: attempts.filter(a => (a.score / a.max_score) * 100 >= 60 && (a.score / a.max_score) * 100 < 70).length },
+                  { range: 'Below 60%', color: 'bg-red-500', count: attempts.filter(a => (a.score / a.max_score) * 100 < 60).length }
+                ].map((item) => (
+                  <div key={item.range} className="flex items-center">
+                    <div className="w-20 text-sm text-gray-600">{item.range}</div>
+                    <div className="flex-1 mx-4">
+                      <div className="bg-gray-200 rounded-full h-4">
+                        <div
+                          className={`${item.color} h-4 rounded-full`}
+                          style={{ width: `${attempts.length > 0 ? (item.count / attempts.length) * 100 : 0}%` }}
+                        ></div>
+                      </div>
                     </div>
+                    <div className="w-12 text-sm text-gray-900 text-right">{item.count}</div>
                   </div>
-                  <div className="w-12 text-sm text-gray-900 text-right">{item.count}</div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Recent Activity */}
@@ -496,15 +528,17 @@ export default function QuizAnalytics() {
                   />
                 </div>
               </div>
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value as any)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Attempts</option>
-                <option value="passed">Passed (≥70%)</option>
-                <option value="failed">Failed (&lt;70%)</option>
-              </select>
+              {!gradingDisabled && (
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="all">All Attempts</option>
+                  <option value="passed">Passed (≥70%)</option>
+                  <option value="failed">Failed (&lt;70%)</option>
+                </select>
+              )}
               <select
                 value={`${sortBy}-${sortOrder}`}
                 onChange={(e) => {
@@ -570,13 +604,17 @@ export default function QuizAnalytics() {
                         {percentage.toFixed(1)}%
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          percentage >= 70
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {percentage >= 70 ? 'Passed' : 'Failed'}
-                        </span>
+                        {gradingDisabled ? (
+                          <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-700">Grading Disabled</span>
+                        ) : (
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            percentage >= 70
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {percentage >= 70 ? 'Passed' : 'Failed'}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {timeSpent} min

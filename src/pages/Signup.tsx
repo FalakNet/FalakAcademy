@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePlatformSettings } from '../hooks/usePlatformSettings';
-import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Users, Award, CheckCircle, AlertCircle } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Award, CheckCircle, AlertCircle } from 'lucide-react';
 import TermsOfService from '../components/TermsOfService';
 import PrivacyPolicy from '../components/PrivacyPolicy';
 
@@ -58,10 +58,7 @@ export default function Signup() {
 
     setLoading(true);
 
-    try {
-      // Store acceptance timestamp in user metadata
-      const acceptanceTimestamp = new Date().toISOString();
-      
+    try {      
       await signUp(email, password, name);
       
       // Note: In a production environment, you would also want to store the acceptance

@@ -462,7 +462,7 @@ export default function AdminSettings() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 lg:p-6">
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>

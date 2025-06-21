@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, Certificate, Course } from '../lib/supabase';
-import { Award, Download, Calendar, Hash, BookOpen } from 'lucide-react';
+import { Award, Calendar, Hash, BookOpen } from 'lucide-react';
 import CertificateGenerator from '../components/CertificateGenerator';
 
 interface CertificateWithCourse extends Certificate {
@@ -48,7 +48,7 @@ export default function Certificates() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 lg:p-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">My Certificates</h1>

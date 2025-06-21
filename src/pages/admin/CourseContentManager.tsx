@@ -78,6 +78,10 @@ export default function CourseContentManager() {
     is_published: false // Add published state for content too
   });
 
+  // Add passingScore and disableGrading state for quiz content
+  const [quizPassingScore, setQuizPassingScore] = useState<number>(70);
+  const [quizDisableGrading, setQuizDisableGrading] = useState<boolean>(false);
+
   useEffect(() => {
     if (courseId && isAdmin()) {
       loadCourseData();
@@ -302,6 +306,13 @@ export default function CourseContentManager() {
           originalUrl: newContent.content_data.url
         };
       }
+
+      // Set passingScore in content_data
+      newContent.content_data = {
+        ...newContent.content_data,
+        quiz_id: quizId,
+        passingScore: quizDisableGrading ? 0 : quizPassingScore
+      };
 
       const { error } = await supabase
         .from('section_content')
@@ -661,6 +672,31 @@ export default function CourseContentManager() {
                 </a>
               </div>
             )}
+
+            {/* Add UI for passingScore and disable grading */}
+            {newContent.content_type === 'quiz' && (
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="block text-sm font-medium text-gray-700">Passing Score (%)</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={quizPassingScore}
+                  onChange={e => setQuizPassingScore(Number(e.target.value))}
+                  disabled={quizDisableGrading}
+                  className="w-32 px-2 py-1 border border-gray-300 rounded-lg"
+                />
+                <label className="inline-flex items-center mt-1">
+                  <input
+                    type="checkbox"
+                    checked={quizDisableGrading}
+                    onChange={e => setQuizDisableGrading(e.target.checked)}
+                    className="form-checkbox h-5 w-5 text-blue-600"
+                  />
+                  <span className="ml-2 text-sm">Disable Grading (all attempts pass, pass % set to 0)</span>
+                </label>
+              </div>
+            )}
           </div>
         );
 
@@ -737,7 +773,7 @@ export default function CourseContentManager() {
   }
 
   return (
-    <div className="space-y-10 max-w-5xl mx-auto px-2 md:px-0">
+    <div className="space-y-10 max-w-5xl mx-auto px-2 md:px-0 p-4 lg:p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 md:gap-0 pb-2 border-b border-gray-200 dark:border-gray-700">
         <div>

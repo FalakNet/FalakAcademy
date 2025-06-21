@@ -247,11 +247,31 @@ export default function QuizTaking() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
+  // Helper to get passingScore from section_content for this quiz
+  function getPassingScoreFromSectionContent(): number {
+    // Try to find the section_content for this quiz
+    // This assumes the quizId is in the URL and matches a section_content
+    // You may want to pass it as a prop or context if needed
+    const allSections = window.__ALL_COURSE_SECTIONS__ || [];
+    for (const section of allSections) {
+      for (const content of section.content || []) {
+        if (content.content_type === 'quiz' && content.content_data?.quiz_id === quizId) {
+          return typeof content.content_data.passingScore === 'number' ? content.content_data.passingScore : 70;
+        }
+      }
+    }
+    return 70;
+  }
+
+  // Detect grading disabled using section_content passingScore
+  const passingScore = getPassingScoreFromSectionContent();
+  const gradingDisabled = passingScore === 0;
+
   const getBestScore = () => {
     if (previousAttempts.length === 0) return null;
     const completedAttempts = previousAttempts.filter(attempt => attempt.completed);
     if (completedAttempts.length === 0) return null;
-    
+    if (gradingDisabled) return 100;
     return Math.max(...completedAttempts.map(attempt => 
       Math.round((attempt.score / attempt.max_score) * 100)
     ));
@@ -271,7 +291,7 @@ export default function QuizTaking() {
 
   if (!quiz) {
     return (
-      <div className="text-center py-12">
+      <div className="text-center py-12 p-4 lg:p-6">
         <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Quiz not found</h2>
         <p className="text-gray-600 dark:text-gray-400">This quiz doesn't exist or has no questions.</p>
@@ -316,9 +336,9 @@ export default function QuizTaking() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                  {bestScore !== null ? `${bestScore}%` : 'N/A'}
+                  {gradingDisabled ? 'Grading Disabled' : bestScore !== null ? `${bestScore}%` : 'N/A'}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Best Score</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{gradingDisabled ? 'Grading Disabled' : 'Best Score'}</p>
               </div>
             </div>
 
@@ -328,7 +348,7 @@ export default function QuizTaking() {
                 <div className="space-y-2">
                   {completedAttempts.map((attempt, index) => {
                     const percentage = Math.round((attempt.score / attempt.max_score) * 100);
-                    const passed = percentage >= 70;
+                    const passed = gradingDisabled ? true : percentage >= passingScore;
                     
                     return (
                       <div key={attempt.id} className="flex justify-between items-center p-3 bg-white dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-500">
@@ -337,21 +357,19 @@ export default function QuizTaking() {
                             Attempt {index + 1}
                           </span>
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            passed
+                            gradingDisabled
+                              ? 'bg-gray-200 text-gray-700'
+                              : passed
                               ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400'
                               : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400'
                           }`}>
-                            {passed ? (
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                            ) : (
-                              <XCircle className="w-3 h-3 mr-1" />
-                            )}
-                            {passed ? 'Passed' : 'Failed'}
+                            {gradingDisabled ? 'Grading Disabled' : passed ? <CheckCircle className="w-3 h-3 mr-1" /> : <XCircle className="w-3 h-3 mr-1" />}
+                            {gradingDisabled ? 'Grading Disabled' : passed ? 'Passed' : 'Failed'}
                           </span>
                         </div>
                         <div className="text-right">
                           <span className="font-medium text-gray-900 dark:text-white">
-                            {percentage}%
+                            {gradingDisabled ? '—' : `${percentage}%`}
                           </span>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
                             {new Date(attempt.completed_at!).toLocaleDateString()}
@@ -364,8 +382,16 @@ export default function QuizTaking() {
               </div>
             )}
           </div>
-
-          {bestScore !== null && bestScore >= 70 && (
+          {gradingDisabled ? (
+            <div className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
+                <p className="text-gray-800 dark:text-gray-200 font-medium">
+                  Grading is disabled for this quiz. All attempts are considered passing.
+                </p>
+              </div>
+            </div>
+          ) : bestScore !== null && bestScore >= passingScore && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
               <div className="flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
@@ -375,7 +401,6 @@ export default function QuizTaking() {
               </div>
             </div>
           )}
-
           <button
             onClick={() => navigate(-1)}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -390,35 +415,35 @@ export default function QuizTaking() {
   // Quiz completion screen
   if (quizCompleted && score) {
     const percentage = Math.round((score.score / score.maxScore) * 100);
-    const passed = percentage >= 70; // 70% passing grade
+    const passed = gradingDisabled ? true : percentage >= passingScore;
     const bestScore = getBestScore();
     const isNewBest = bestScore === null || percentage > bestScore;
     const attemptsRemaining = getAttemptsRemaining();
-
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
           <div className={`w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center ${
-            passed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
+            gradingDisabled ? 'bg-gray-200 dark:bg-gray-700' : passed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'
           }`}>
-            {passed ? (
+            {gradingDisabled ? (
+              <CheckCircle className="w-10 h-10 text-gray-600 dark:text-gray-400" />
+            ) : passed ? (
               <CheckCircle className="w-10 h-10 text-green-600 dark:text-green-400" />
             ) : (
               <XCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
             )}
           </div>
-
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            {passed ? 'Congratulations!' : 'Quiz Completed'}
+            {gradingDisabled ? 'Grading Disabled' : passed ? 'Congratulations!' : 'Quiz Completed'}
           </h1>
-          
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            {passed 
-              ? 'You have successfully completed the quiz!' 
-              : 'You completed the quiz, but didn\'t reach the passing grade.'}
+            {gradingDisabled
+              ? 'Grading is disabled for this quiz. All attempts are considered passing.'
+              : passed 
+                ? 'You have successfully completed the quiz!' 
+                : 'You completed the quiz, but didn\'t reach the passing grade.'}
           </p>
-
-          {isNewBest && bestScore !== null && (
+          {isNewBest && bestScore !== null && !gradingDisabled && (
             <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-6">
               <p className="text-yellow-800 dark:text-yellow-200 font-medium">🎉 New Personal Best!</p>
               <p className="text-yellow-700 dark:text-yellow-300 text-sm">
@@ -426,7 +451,6 @@ export default function QuizTaking() {
               </p>
             </div>
           )}
-
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 mb-6">
             <div className="grid grid-cols-3 gap-4 text-center">
               <div>
@@ -438,13 +462,10 @@ export default function QuizTaking() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Total Points</p>
               </div>
               <div>
-                <p className={`text-2xl font-bold ${passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {percentage}%
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Score</p>
+                <p className={`text-2xl font-bold ${gradingDisabled ? 'text-gray-600 dark:text-gray-400' : passed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{gradingDisabled ? '—' : `${percentage}%`}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{gradingDisabled ? 'Grading Disabled' : 'Score'}</p>
               </div>
             </div>
-
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
               <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
                 <span>Attempts used: {attemptsUsed} of {quiz.max_attempts}</span>
@@ -452,7 +473,6 @@ export default function QuizTaking() {
               </div>
             </div>
           </div>
-
           <div className="flex justify-center space-x-4">
             <button
               onClick={() => navigate(-1)}
@@ -460,7 +480,7 @@ export default function QuizTaking() {
             >
               Back to Course
             </button>
-            {!passed && attemptsRemaining > 0 && (
+            {!gradingDisabled && !passed && attemptsRemaining > 0 && (
               <button
                 onClick={() => window.location.reload()}
                 className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
@@ -536,7 +556,7 @@ export default function QuizTaking() {
               )}
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Passing Grade</p>
-                <p className="font-medium text-gray-900 dark:text-white">70%</p>
+                <p className="font-medium text-gray-900 dark:text-white">{gradingDisabled ? 'Grading Disabled' : `${passingScore}%`}</p>
               </div>
               {bestScore !== null && (
                 <div className="col-span-2">
@@ -570,11 +590,9 @@ export default function QuizTaking() {
   // Quiz taking interface
   const currentQuestion = questions[currentQuestionIndex];
   const answeredQuestions = Object.keys(answers).length;
-  const progress = (answeredQuestions / questions.length) * 100;
-  const attemptsRemaining = getAttemptsRemaining();
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-4xl mx-auto p-4 lg:p-6">
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
         <div className="flex justify-between items-center mb-4">

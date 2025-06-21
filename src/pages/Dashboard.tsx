@@ -293,7 +293,7 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="space-y-6 sm:space-y-8 p-4 lg:p-6">
       {/* Header */}
       <div className="flex items-start sm:items-center">
         <div className="min-w-0 flex-1">

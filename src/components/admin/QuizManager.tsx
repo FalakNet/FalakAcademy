@@ -98,8 +98,9 @@ export default function QuizManager({ quizId, showAnalyticsButton }: QuizManager
     if (typeof settings.title === 'string' && settings.title.trim() !== '') updatePayload.title = settings.title.trim();
     if (typeof settings.description === 'string') updatePayload.description = settings.description.trim() === '' ? null : settings.description.trim();
     if (typeof settings.max_attempts === 'number' && !isNaN(settings.max_attempts)) updatePayload.max_attempts = settings.max_attempts;
-    // Only send time_limit if it's a number or null
     if (settings.time_limit === null || (typeof settings.time_limit === 'number' && !isNaN(settings.time_limit))) updatePayload.time_limit = settings.time_limit;
+    // Add grading_disabled field
+    // updatePayload.grading_disabled = settings.grading_disabled === true;
     // passing_score removed from update payload
     // Add more fields as needed, following the same pattern
 
@@ -111,6 +112,15 @@ export default function QuizManager({ quizId, showAnalyticsButton }: QuizManager
     else setAlert({ open: true, message: error.message || 'Failed to update quiz settings.', type: 'error' });
     setSettingsLoading(false);
     fetchSettings();
+
+    // If grading is disabled, update the section content schema to set passing_score to 0
+    // if (settings.grading_disabled) {
+    //   // Find the section content for this quiz and update passing_score to 0
+    //   await supabase
+    //     .from('section_content')
+    //     .update({ passing_score: 0 })
+    //     .eq('quiz_id', quizId);
+    // }
   }
 
   // CRUD for questions

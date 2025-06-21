@@ -5,8 +5,8 @@ import { supabase, Course, CourseSection, SectionContent, ContentCompletion } fr
 import { 
   BookOpen, Play, FileText, Brain, File, Image, 
   ChevronDown, ChevronRight, CheckCircle, Clock, 
-  ArrowLeft, ArrowRight, Award, Eye, Download,
-  ChevronLeft, Menu, X, Trophy, Star, Target, AlertCircle
+  ArrowLeft, ArrowRight, Award, Eye, Download, 
+  Menu, X, Trophy, Target
 } from 'lucide-react';
 import CertificateGenerator from '../components/CertificateGenerator';
 import MarkdownRenderer from '../components/MarkdownRenderer';
@@ -638,134 +638,110 @@ export default function CourseDetail() {
         const quizId = contentData.quiz_id;
         const attemptSummary = quizId ? quizAttempts.get(quizId) : null;
         const hasAttempted = attemptSummary && attemptSummary.totalAttempts > 0;
+        // Use passingScore from contentData, default 70
+        const passingScore = typeof contentData.passingScore === 'number' ? contentData.passingScore : 70;
+        const gradingDisabled = passingScore === 0;
+        // Calculate pass/fail for this quiz using passingScore
+        const passed = gradingDisabled ? true : (attemptSummary ? attemptSummary.bestScore >= passingScore : false);
 
         return (
-          <div className="space-y-4">
-            <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg p-6">
-              <div className="flex items-center mb-4">
-                <Brain className="w-8 h-8 text-purple-600 dark:text-purple-400 mr-3" />
-                <div>
-                  <h4 className="font-medium text-gray-900 dark:text-white">Quiz Assessment</h4>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Test your knowledge and understanding</p>
+          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-purple-800 shadow-lg p-0 overflow-hidden max-w-2xl mx-auto">
+            <div className="flex items-center gap-3 px-6 pt-6 pb-2">
+              <Brain className="w-10 h-10 text-purple-600 dark:text-purple-400" />
+              <div>
+                <h4 className="font-bold text-xl text-gray-900 dark:text-white mb-1">Quiz Assessment</h4>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Test your knowledge and understanding</p>
+              </div>
+            </div>
+            {contentData.instructions && (
+              <div className="px-6 pt-2 pb-4">
+                <MarkdownRenderer 
+                  content={contentData.instructions} 
+                  className="text-gray-700 dark:text-gray-300 text-base"
+                />
+              </div>
+            )}
+            {/* Divider */}
+            <div className="border-t border-purple-100 dark:border-purple-800" />
+            {/* Quiz Statistics */}
+            {hasAttempted && attemptSummary && (
+              <div className="px-6 py-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${gradingDisabled ? 'text-gray-600' : passed ? 'text-green-600' : 'text-orange-600'}`}>{gradingDisabled ? '—' : `${attemptSummary.bestScore}%`}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Best Score</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">{attemptSummary.totalAttempts}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Attempts</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-purple-600">{attemptSummary.attemptsRemaining}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Remaining</div>
+                  </div>
+                  <div className="text-center">
+                    <div className={`text-2xl font-bold ${gradingDisabled ? 'text-gray-600' : passed ? 'text-green-600' : 'text-red-600'}`}>{gradingDisabled ? '✓' : passed ? '✓' : '✗'}</div>
+                    <div className="text-xs text-gray-600 dark:text-gray-400">Status</div>
+                  </div>
+                </div>
+                {gradingDisabled ? (
+                  <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-2 mt-2 mb-0">
+                    <CheckCircle className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
+                    <span className="text-gray-800 dark:text-gray-200 font-medium">Grading is disabled for this quiz. All attempts are considered passing.</span>
+                  </div>
+                ) : passed && (
+                  <div className="flex items-center justify-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2 mt-2 mb-0">
+                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                    <span className="text-green-800 dark:text-green-200 font-medium">Congratulations! You passed this quiz.</span>
+                  </div>
+                )}
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
+                  Last attempt: {new Date(attemptSummary.lastAttemptDate).toLocaleDateString()} at {new Date(attemptSummary.lastAttemptDate).toLocaleTimeString()}
                 </div>
               </div>
-              
-              {contentData.instructions && (
-                <div className="mb-4">
-                  <h5 className="font-medium text-gray-900 dark:text-white mb-2">Instructions</h5>
-                  <MarkdownRenderer 
-                    content={contentData.instructions} 
-                    className="text-gray-700 dark:text-gray-300"
-                  />
-                </div>
-              )}
-
-              {/* Quiz Statistics */}
-              {hasAttempted && attemptSummary && (
-                <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-purple-200 dark:border-purple-700">
-                  <h5 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center">
-                    <Star className="w-4 h-4 mr-2 text-yellow-500" />
-                    Your Performance
-                  </h5>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div className="text-center">
-                      <div className={`text-2xl font-bold ${
-                        attemptSummary.passed ? 'text-green-600' : 'text-orange-600'
-                      }`}>
-                        {attemptSummary.bestScore}%
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">Best Score</div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {attemptSummary.totalAttempts}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">Attempts</div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {attemptSummary.attemptsRemaining}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">Remaining</div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className={`text-2xl font-bold ${
-                        attemptSummary.passed ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {attemptSummary.passed ? '✓' : '✗'}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-400">Status</div>
-                    </div>
-                  </div>
-
-                  {attemptSummary.passed && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 mb-4">
-                      <div className="flex items-center">
-                        <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                        <span className="text-green-800 dark:text-green-200 font-medium">
-                          Congratulations! You passed this quiz.
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Last attempt: {new Date(attemptSummary.lastAttemptDate).toLocaleDateString()} at {new Date(attemptSummary.lastAttemptDate).toLocaleTimeString()}
-                  </div>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3">
-                {quizId && (
-                  <>
-                    {hasAttempted ? (
-                      <>
-                        <button
-                          onClick={() => navigate(`/quiz/${quizId}`)}
-                          className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors border border-purple-300 dark:border-purple-700"
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Quiz Details
-                        </button>
-                        
-                        {attemptSummary && attemptSummary.attemptsRemaining > 0 && (
-                          <button
-                            onClick={() => navigate(`/quiz/${quizId}`)}
-                            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                          >
-                            <Target className="w-4 h-4 mr-2" />
-                            {attemptSummary.passed ? 'Improve Score' : 'Retake Quiz'}
-                            <span className="ml-2 text-xs bg-purple-500 px-2 py-1 rounded-full">
-                              {attemptSummary.attemptsRemaining} left
-                            </span>
-                          </button>
-                        )}
-                      </>
-                    ) : (
+            )}
+            {/* Divider */}
+            <div className="border-t border-purple-100 dark:border-purple-800" />
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 px-6 py-4">
+              {quizId && (
+                <>
+                  {hasAttempted ? (
+                    <>
                       <button
                         onClick={() => navigate(`/quiz/${quizId}`)}
-                        className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors border border-purple-300 dark:border-purple-700"
                       >
-                        <Brain className="w-4 h-4 mr-2" />
-                        Start Quiz
+                        <Eye className="w-4 h-4 mr-2" />
+                        View Quiz Details
                       </button>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Passing Score Info */}
-              <div className="mt-4 pt-4 border-t border-purple-200 dark:border-purple-700">
-                <div className="flex items-center text-sm text-gray-600 dark:text-gray-400">
-                  <Target className="w-4 h-4 mr-2" />
-                  <span>Passing score: 70% • {contentData.passingScore || 70}% required to pass</span>
-                </div>
-              </div>
+                      {attemptSummary && attemptSummary.attemptsRemaining > 0 && (
+                        <button
+                          onClick={() => navigate(`/quiz/${quizId}`)}
+                          className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                        >
+                          <Target className="w-4 h-4 mr-2" />
+                          {attemptSummary.passed ? 'Improve Score' : 'Retake Quiz'}
+                          <span className="ml-2 text-xs bg-purple-500 px-2 py-1 rounded-full">{attemptSummary.attemptsRemaining} left</span>
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => navigate(`/quiz/${quizId}`)}
+                      className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      <Brain className="w-4 h-4 mr-2" />
+                      Start Quiz
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            {/* Passing Score Info as footer bar */}
+            <div className="bg-purple-50 dark:bg-purple-900/20 border-t border-purple-100 dark:border-purple-800 px-6 py-3 flex items-center text-sm text-gray-600 dark:text-gray-400">
+              <Target className="w-4 h-4 mr-2 text-purple-500" />
+              <span>{gradingDisabled ? <b>Grading Disabled: All attempts pass</b> : <>Passing score: <b>{passingScore}%</b> required to pass</>}</span>
             </div>
           </div>
         );
@@ -829,13 +805,13 @@ export default function CourseDetail() {
         message={alertModal.message}
         type={alertModal.type}
       />
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 relative">
+      <div className="flex h-screen bg-gray-50 dark:bg-gray-900 relative overflow-hidden">
         {/* Sidebar overlay for mobile */}
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-40 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
         )}
         {/* Sidebar */}
-        <aside className={`fixed z-50 top-0 left-0 h-full w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:static lg:translate-x-0 lg:w-72`}>
+        <aside className={`fixed z-50 top-0 left-0 h-full w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:static lg:translate-x-0 lg:w-80`}>
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 lg:hidden">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">{course?.title}</h2>
             <button onClick={() => setSidebarOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
@@ -857,8 +833,8 @@ export default function CourseDetail() {
             ))}
           </div>
         </aside>
-        {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0 h-full">
+        {/* Main content - full height, no card, minimal padding */}
+        <main className="flex-1 flex flex-col min-w-0 h-full">
           {/* Top bar for mobile */}
           <div className="flex items-center justify-between bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 lg:hidden sticky top-0 z-30">
             <button onClick={() => setSidebarOpen(true)} className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
@@ -867,11 +843,11 @@ export default function CourseDetail() {
             <h1 className="text-base font-bold text-gray-900 dark:text-white truncate">{course?.title}</h1>
             <div className="w-6 h-6" />
           </div>
-          {/* Main content area */}
-          <div className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-8 h-full w-full">
+          {/* Main content area - no card, just content */}
+          <div className="flex-1 overflow-y-auto h-full w-full px-0 sm:px-2 lg:px-6 py-2 lg:py-6">
             {renderContent()}
           </div>
-          {/* Sticky bottom nav for mobile */}
+          {/* Sticky bottom nav for all screens */}
           <MobileNavBar
             currentIndex={currentIndex}
             allContent={allContent}
@@ -880,7 +856,7 @@ export default function CourseDetail() {
             markContentComplete={markContentComplete}
             navigateToContent={navigateToContent}
           />
-        </div>
+        </main>
       </div>
 
       {/* Course Completion Modal */}
@@ -1061,33 +1037,41 @@ function SidebarSection({ section, expanded, onToggle, onSelectContent, currentC
 // --- Reusable MobileNavBar component ---
 function MobileNavBar({ currentIndex, allContent, currentContent, canMarkContentComplete, markContentComplete, navigateToContent }) {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-2 py-2 space-x-2 shadow-lg">
-      <button
-        onClick={() => navigateToContent('prev')}
-        disabled={currentIndex <= 0}
-        className="flex-1 inline-flex items-center justify-center px-2 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
+    <div
+      className="fixed bottom-0 left-0 right-0 w-full z-30 pointer-events-none lg:sticky lg:bottom-0 lg:left-auto lg:right-auto lg:w-full lg:max-w-screen-xl lg:mx-auto lg:px-6 lg:pb-0 lg:pointer-events-auto"
+    >
+      <div
+        className="bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 shadow-lg flex items-center justify-between px-2 py-2 space-x-2
+          rounded-t-xl border-t pointer-events-auto transition-all duration-200 min-h-[56px] lg:min-h-[72px]
+          w-full"
       >
-        <ArrowLeft className="w-4 h-4 mr-1" /> Prev
-      </button>
-      {currentContent && !currentContent.completed && (() => {
-        const { canComplete } = canMarkContentComplete(currentContent);
-        return (
-          <button
-            onClick={() => canComplete ? markContentComplete(currentContent.id) : null}
-            disabled={!canComplete}
-            className="flex-1 inline-flex items-center justify-center px-2 py-2 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 text-xs disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <CheckCircle className="w-4 h-4 mr-1" /> Complete
-          </button>
-        );
-      })()}
-      <button
-        onClick={() => navigateToContent('next')}
-        disabled={currentIndex >= allContent.length - 1}
-        className="flex-1 inline-flex items-center justify-center px-2 py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs"
-      >
-        Next <ArrowRight className="w-4 h-4 ml-1" />
-      </button>
+        <button
+          onClick={() => navigateToContent('prev')}
+          disabled={currentIndex <= 0}
+          className="flex-1 inline-flex items-center justify-center py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-base"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" /> Prev
+        </button>
+        {currentContent && !currentContent.completed && (() => {
+          const { canComplete } = canMarkContentComplete(currentContent);
+          return (
+            <button
+              onClick={() => canComplete ? markContentComplete(currentContent.id) : null}
+              disabled={!canComplete}
+              className="flex-1 inline-flex items-center justify-center py-2 rounded-lg transition-colors bg-green-600 text-white hover:bg-green-700 text-xs lg:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <CheckCircle className="w-4 h-4 mr-1" /> Complete
+            </button>
+          );
+        })()}
+        <button
+          onClick={() => navigateToContent('next')}
+          disabled={currentIndex >= allContent.length - 1}
+          className="flex-1 inline-flex items-center justify-center py-2 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-xs lg:text-base"
+        >
+          Next <ArrowRight className="w-4 h-4 ml-1" />
+        </button>
+      </div>
     </div>
   );
 }
