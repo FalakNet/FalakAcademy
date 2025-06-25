@@ -192,6 +192,7 @@ export interface Quiz {
   time_limit?: number;
   created_by: string;
   created_at: string;
+  view_answers: boolean; // Allow learners to view answers after quiz
 }
 
 export interface Question {

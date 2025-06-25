@@ -27,7 +27,7 @@ export default function QuizTaking() {
     isOpen: false,
     title: '',
     message: '',
-    type: 'info',
+    type: 'info' as 'success' | 'error' | 'warning' | 'info',
   });
 
   const showAlert = (title: string, message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') => {
@@ -419,6 +419,8 @@ export default function QuizTaking() {
     const bestScore = getBestScore();
     const isNewBest = bestScore === null || percentage > bestScore;
     const attemptsRemaining = getAttemptsRemaining();
+    // Show answers if allowed
+    const canViewAnswers = quiz?.view_answers;
     return (
       <div className="max-w-2xl mx-auto">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -473,6 +475,33 @@ export default function QuizTaking() {
               </div>
             </div>
           </div>
+          {/* Show correct answers if allowed */}
+          {canViewAnswers && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6 mt-6">
+              <h3 className="font-semibold text-blue-900 dark:text-blue-200 mb-4">Quiz Answers</h3>
+              <div className="space-y-4 text-left">
+                {questions.map((q, idx) => (
+                  <div key={q.id} className="p-4 bg-white dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                    <div className="font-medium text-gray-900 dark:text-white mb-2">Q{idx + 1}: {q.question_text}</div>
+                    <ul className="list-disc ml-6">
+                      {q.options.map((opt, i) => (
+                        <li key={i} className={
+                          i === q.correct_option
+                            ? 'text-green-700 dark:text-green-400 font-semibold'
+                            : 'text-gray-700 dark:text-gray-300'
+                        }>
+                          {opt} {i === q.correct_option && <span className="ml-2">(Correct)</span>}
+                          {answers[q.id] === i && i !== q.correct_option && (
+                            <span className="ml-2 text-red-500">(Your answer)</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex justify-center space-x-4">
             <button
               onClick={() => navigate(-1)}
@@ -548,7 +577,7 @@ export default function QuizTaking() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Attempts Remaining</p>
                 <p className="font-medium text-gray-900 dark:text-white">{attemptsRemaining} of {quiz.max_attempts}</p>
               </div>
-              {quiz.time_limit && (
+              {quiz.time_limit && !gradingDisabled && (
                 <div>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Time Limit</p>
                   <p className="font-medium text-gray-900 dark:text-white">{quiz.time_limit} minutes</p>
@@ -558,7 +587,7 @@ export default function QuizTaking() {
                 <p className="text-sm text-gray-600 dark:text-gray-400">Passing Grade</p>
                 <p className="font-medium text-gray-900 dark:text-white">{gradingDisabled ? 'Grading Disabled' : `${passingScore}%`}</p>
               </div>
-              {bestScore !== null && (
+              {bestScore !== null && !gradingDisabled && (
                 <div className="col-span-2">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Your Best Score</p>
                   <p className="font-medium text-green-600 dark:text-green-400">{bestScore}%</p>
@@ -722,6 +751,18 @@ export default function QuizTaking() {
           ))}
         </div>
       </div>
+
+      {/* If grading is disabled, show info banner */}
+      {gradingDisabled && (
+        <div className="mt-6 bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4">
+          <div className="flex items-center justify-center">
+            <CheckCircle className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
+            <p className="text-gray-800 dark:text-gray-200 font-medium">
+              Grading is disabled for this quiz. All attempts are considered passing.
+            </p>
+          </div>
+        </div>
+      )}
 
       <AlertModal
         isOpen={alertModal.isOpen}

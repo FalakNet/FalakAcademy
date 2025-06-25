@@ -78,9 +78,10 @@ export default function CourseContentManager() {
     is_published: false // Add published state for content too
   });
 
-  // Add passingScore and disableGrading state for quiz content
+  // Add passingScore, disableGrading, and viewAnswers state for quiz content
   const [quizPassingScore, setQuizPassingScore] = useState<number>(70);
   const [quizDisableGrading, setQuizDisableGrading] = useState<boolean>(false);
+  const [quizViewAnswers, setQuizViewAnswers] = useState<boolean>(false);
 
   useEffect(() => {
     if (courseId && isAdmin()) {
@@ -307,12 +308,21 @@ export default function CourseContentManager() {
         };
       }
 
-      // Set passingScore in content_data
+      // Set passingScore and view_answers in content_data
       newContent.content_data = {
         ...newContent.content_data,
         quiz_id: quizId,
-        passingScore: quizDisableGrading ? 0 : quizPassingScore
+        passingScore: quizDisableGrading ? 0 : quizPassingScore,
+        view_answers: quizViewAnswers,
       };
+
+      // Also update quizzes table with view_answers
+      if (newContent.content_type === 'quiz' && quizId) {
+        await supabase
+          .from('quizzes')
+          .update({ view_answers: quizViewAnswers })
+          .eq('id', quizId);
+      }
 
       const { error } = await supabase
         .from('section_content')
@@ -694,6 +704,15 @@ export default function CourseContentManager() {
                     className="form-checkbox h-5 w-5 text-blue-600"
                   />
                   <span className="ml-2 text-sm">Disable Grading (all attempts pass, pass % set to 0)</span>
+                </label>
+                <label className="inline-flex items-center mt-1">
+                  <input
+                    type="checkbox"
+                    checked={quizViewAnswers}
+                    onChange={e => setQuizViewAnswers(e.target.checked)}
+                    className="form-checkbox h-5 w-5 text-blue-600"
+                  />
+                  <span className="ml-2 text-sm">Allow learners to view correct answers after quiz</span>
                 </label>
               </div>
             )}
