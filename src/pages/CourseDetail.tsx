@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { usePlatformSettings } from '../hooks/usePlatformSettings';
 import { supabase, Course, CourseSection, SectionContent, ContentCompletion } from '../lib/supabase';
 import { 
   BookOpen, Play, FileText, Brain, File, Image, 
@@ -21,18 +22,11 @@ interface ContentWithCompletion extends SectionContent {
   completion?: ContentCompletion;
 }
 
-interface QuizAttemptSummary {
-  totalAttempts: number;
-  bestScore: number;
-  lastAttemptDate: string;
-  passed: boolean;
-  attemptsRemaining: number;
-}
-
 export default function CourseDetail() {
   const { courseId } = useParams<{ courseId: string }>();
   const navigate = useNavigate();
   const { profile } = useAuth();
+  const { settings } = usePlatformSettings();
   const [course, setCourse] = useState<Course | null>(null);
   const [sections, setSections] = useState<SectionWithContent[]>([]);
   const [allSections, setAllSections] = useState<SectionWithContent[]>([]); // All sections including unpublished
@@ -45,7 +39,6 @@ export default function CourseDetail() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
-  const [quizAttempts, setQuizAttempts] = useState<Map<string, QuizAttemptSummary>>(new Map());
   const [alertModal, setAlertModal] = useState({
     isOpen: false,
     title: '',
@@ -218,16 +211,6 @@ export default function CourseDetail() {
         setCompletions(completionsMap);
       }
 
-      // Load quiz attempts for all quiz content
-      const quizContentItems = sectionsWithContent.flatMap(s => 
-        s.content.filter(c => c.content_type === 'quiz' && c.content_data?.quiz_id)
-      );
-
-      if (quizContentItems.length > 0) {
-        const quizIds = quizContentItems.map(c => c.content_data.quiz_id);
-        await loadQuizAttempts(quizIds);
-      }
-
       setCourse(courseData);
       setSections(sectionsWithContent);
       setAllSections(allSectionsWithContent); // Store all sections for progress calculation
@@ -249,66 +232,6 @@ export default function CourseDetail() {
       navigate('/my-courses');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadQuizAttempts = async (quizIds: string[]) => {
-    if (!profile || quizIds.length === 0) return;
-
-    try {
-      // Load all quiz details and user attempts
-      const [quizzesResponse, attemptsResponse] = await Promise.all([
-        supabase
-          .from('quizzes')
-          .select('*')
-          .in('id', quizIds),
-        supabase
-          .from('quiz_attempts')
-          .select('*')
-          .eq('user_id', profile.id)
-          .in('quiz_id', quizIds)
-          .eq('completed', true)
-          .order('completed_at', { ascending: false })
-      ]);
-
-      if (quizzesResponse.error) throw quizzesResponse.error;
-      if (attemptsResponse.error) throw attemptsResponse.error;
-
-      const quizzes = quizzesResponse.data || [];
-      const attempts = attemptsResponse.data || [];
-
-      // Create quiz attempt summaries
-      const quizAttemptsMap = new Map<string, QuizAttemptSummary>();
-
-      quizzes.forEach(quiz => {
-        const quizAttempts = attempts.filter(attempt => attempt.quiz_id === quiz.id);
-        
-        if (quizAttempts.length > 0) {
-          const scores = quizAttempts.map(attempt => (attempt.score / attempt.max_score) * 100);
-          const bestScore = Math.max(...scores);
-          const lastAttempt = quizAttempts[0]; // Already sorted by completed_at desc
-          
-          quizAttemptsMap.set(quiz.id, {
-            totalAttempts: quizAttempts.length,
-            bestScore: Math.round(bestScore),
-            lastAttemptDate: lastAttempt.completed_at!,
-            passed: bestScore >= 70,
-            attemptsRemaining: quiz.max_attempts - quizAttempts.length
-          });
-        } else {
-          quizAttemptsMap.set(quiz.id, {
-            totalAttempts: 0,
-            bestScore: 0,
-            lastAttemptDate: '',
-            passed: false,
-            attemptsRemaining: quiz.max_attempts
-          });
-        }
-      });
-
-      setQuizAttempts(quizAttemptsMap);
-    } catch (error) {
-      console.error('Error loading quiz attempts:', error);
     }
   };
 
@@ -375,20 +298,6 @@ export default function CourseDetail() {
     // If already completed, can't complete again
     if (content.completed) {
       return { canComplete: false, reason: 'Already completed' };
-    }
-
-    // For quiz content, check if user has attempted the quiz
-    if (content.content_type === 'quiz') {
-      const quizId = content.content_data?.quiz_id;
-      if (quizId) {
-        const attemptSummary = quizAttempts.get(quizId);
-        if (!attemptSummary || attemptSummary.totalAttempts === 0) {
-          return { 
-            canComplete: false, 
-            reason: 'You must attempt the quiz before marking it as complete' 
-          };
-        }
-      }
     }
 
     return { canComplete: true };
@@ -634,118 +543,6 @@ export default function CourseDetail() {
           </div>
         );
 
-      case 'quiz':
-        const quizId = contentData.quiz_id;
-        const attemptSummary = quizId ? quizAttempts.get(quizId) : null;
-        const hasAttempted = attemptSummary && attemptSummary.totalAttempts > 0;
-        // Use passingScore from contentData, default 70
-        const passingScore = typeof contentData.passingScore === 'number' ? contentData.passingScore : 70;
-        const gradingDisabled = passingScore === 0;
-        // Calculate pass/fail for this quiz using passingScore
-        const passed = gradingDisabled ? true : (attemptSummary ? attemptSummary.bestScore >= passingScore : false);
-
-        return (
-          <div className="rounded-2xl bg-white dark:bg-gray-900 border border-purple-200 dark:border-purple-800 shadow-lg p-0 overflow-hidden max-w-2xl mx-auto">
-            <div className="flex items-center gap-3 px-6 pt-6 pb-2">
-              <Brain className="w-10 h-10 text-purple-600 dark:text-purple-400" />
-              <div>
-                <h4 className="font-bold text-xl text-gray-900 dark:text-white mb-1">Quiz Assessment</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Test your knowledge and understanding</p>
-              </div>
-            </div>
-            {contentData.instructions && (
-              <div className="px-6 pt-2 pb-4">
-                <MarkdownRenderer 
-                  content={contentData.instructions} 
-                  className="text-gray-700 dark:text-gray-300 text-base"
-                />
-              </div>
-            )}
-            {/* Divider */}
-            <div className="border-t border-purple-100 dark:border-purple-800" />
-            {/* Quiz Statistics */}
-            {hasAttempted && attemptSummary && (
-              <div className="px-6 py-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${gradingDisabled ? 'text-gray-600' : passed ? 'text-green-600' : 'text-orange-600'}`}>{gradingDisabled ? '—' : `${attemptSummary.bestScore}%`}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Best Score</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">{attemptSummary.totalAttempts}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Attempts</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">{attemptSummary.attemptsRemaining}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Remaining</div>
-                  </div>
-                  <div className="text-center">
-                    <div className={`text-2xl font-bold ${gradingDisabled ? 'text-gray-600' : passed ? 'text-green-600' : 'text-red-600'}`}>{gradingDisabled ? '✓' : passed ? '✓' : '✗'}</div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400">Status</div>
-                  </div>
-                </div>
-                {gradingDisabled ? (
-                  <div className="flex items-center justify-center bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-2 mt-2 mb-0">
-                    <CheckCircle className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
-                    <span className="text-gray-800 dark:text-gray-200 font-medium">Grading is disabled for this quiz. All attempts are considered passing.</span>
-                  </div>
-                ) : passed && (
-                  <div className="flex items-center justify-center bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2 mt-2 mb-0">
-                    <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
-                    <span className="text-green-800 dark:text-green-200 font-medium">Congratulations! You passed this quiz.</span>
-                  </div>
-                )}
-                <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
-                  Last attempt: {new Date(attemptSummary.lastAttemptDate).toLocaleDateString()} at {new Date(attemptSummary.lastAttemptDate).toLocaleTimeString()}
-                </div>
-              </div>
-            )}
-            {/* Divider */}
-            <div className="border-t border-purple-100 dark:border-purple-800" />
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 px-6 py-4">
-              {quizId && (
-                <>
-                  {hasAttempted ? (
-                    <>
-                      <button
-                        onClick={() => navigate(`/quiz/${quizId}`)}
-                        className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors border border-purple-300 dark:border-purple-700"
-                      >
-                        <Eye className="w-4 h-4 mr-2" />
-                        View Quiz Details
-                      </button>
-                      {attemptSummary && attemptSummary.attemptsRemaining > 0 && (
-                        <button
-                          onClick={() => navigate(`/quiz/${quizId}`)}
-                          className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                        >
-                          <Target className="w-4 h-4 mr-2" />
-                          {attemptSummary.passed ? 'Improve Score' : 'Retake Quiz'}
-                          <span className="ml-2 text-xs bg-purple-500 px-2 py-1 rounded-full">{attemptSummary.attemptsRemaining} left</span>
-                        </button>
-                      )}
-                    </>
-                  ) : (
-                    <button
-                      onClick={() => navigate(`/quiz/${quizId}`)}
-                      className="inline-flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                    >
-                      <Brain className="w-4 h-4 mr-2" />
-                      Start Quiz
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-            {/* Passing Score Info as footer bar */}
-            <div className="bg-purple-50 dark:bg-purple-900/20 border-t border-purple-100 dark:border-purple-800 px-6 py-3 flex items-center text-sm text-gray-600 dark:text-gray-400">
-              <Target className="w-4 h-4 mr-2 text-purple-500" />
-              <span>{gradingDisabled ? <b>Grading Disabled: All attempts pass</b> : <>Passing score: <b>{passingScore}%</b> required to pass</>}</span>
-            </div>
-          </div>
-        );
-
       default:
         return (
           <div className="text-center py-8">
@@ -770,6 +567,18 @@ export default function CourseDetail() {
         <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Course not found</h2>
         <p className="text-gray-600 dark:text-gray-400">The course you're looking for doesn't exist or you don't have access to it.</p>
+      </div>
+    );
+  }
+
+  // Disable all quiz support if platform setting is off
+  if (settings && settings.enable_quizzes === false) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Quizzes are currently disabled</h1>
+          <p className="text-gray-600 dark:text-gray-400">The platform administrator has disabled quiz functionality. Please check back later or contact support for more information.</p>
+        </div>
       </div>
     );
   }
@@ -829,7 +638,6 @@ export default function CourseDetail() {
                 onSelectContent={handleSelectContent}
                 currentContentId={currentContent?.id}
                 completions={completions}
-                quizAttempts={quizAttempts}
               />
             ))}
           </div>
@@ -974,7 +782,7 @@ export default function CourseDetail() {
 }
 
 // --- Reusable SidebarSection component ---
-function SidebarSection({ section, expanded, onToggle, onSelectContent, currentContentId, completions, quizAttempts }) {
+function SidebarSection({ section, expanded, onToggle, onSelectContent, currentContentId, completions }) {
   return (
     <div className="border-b border-gray-100 dark:border-gray-700">
       <button
@@ -998,9 +806,6 @@ function SidebarSection({ section, expanded, onToggle, onSelectContent, currentC
           {section.content.map((content) => {
             const isCompleted = completions.has(content.id);
             const isCurrent = currentContentId === content.id;
-            const isQuiz = content.content_type === 'quiz';
-            const quizId = isQuiz ? content.content_data?.quiz_id : null;
-            const attemptSummary = quizId ? quizAttempts.get(quizId) : null;
             return (
               <button
                 key={content.id}
@@ -1013,16 +818,12 @@ function SidebarSection({ section, expanded, onToggle, onSelectContent, currentC
                     <div className="flex items-center justify-between">
                       <h4 className={`text-sm font-medium ${isCurrent ? 'text-blue-900 dark:text-blue-200' : 'text-gray-900 dark:text-white'}`}>{content.title}</h4>
                       <div className="flex items-center space-x-1">
-                        {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (
-                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${attemptSummary.passed ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' : 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'}`}>{attemptSummary.bestScore}%</span>
-                        )}
                         {isCompleted && <CheckCircle className="w-4 h-4 text-green-500" />}
                       </div>
                     </div>
                     <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-1">
                       <span className="capitalize">{content.content_type}</span>
                       {content.duration_minutes > 0 && (<><span className="mx-1">•</span><Clock className="w-3 h-3 mr-1" /><span>{content.duration_minutes} min</span></>)}
-                      {isQuiz && attemptSummary && attemptSummary.totalAttempts > 0 && (<><span className="mx-1">•</span><span>{attemptSummary.totalAttempts} attempt{attemptSummary.totalAttempts !== 1 ? 's' : ''}</span></>)}
                     </div>
                   </div>
                 </div>

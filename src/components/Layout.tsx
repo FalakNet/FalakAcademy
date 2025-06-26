@@ -92,7 +92,6 @@ export default function Layout({ children }: LayoutProps) {
   const closeSidebar = () => setSidebarOpen(false);
 
   // Logo URL and color logic
-  const logoUrl = getAssetUrl(settings.site_logo_url);
   function getThemeMode() {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
     if (stored === 'dark' || stored === 'light') return stored;
@@ -123,7 +122,7 @@ export default function Layout({ children }: LayoutProps) {
                   src="/ficon.svg" 
                   alt={settings.site_name}
                   className="w-8 h-8 mr-3 object-contain"
-                  style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
+                  style={{ filter: themeMode === 'dark' ? undefined : 'brightness(0) saturate(100%) invert(59%) sepia(78%) saturate(7488%) hue-rotate(252deg) brightness(95%) contrast(94%)' }}
                 />
               <h1 className="text-xl font-bold text-gray-900 dark:text-white">{settings.site_name}</h1>
             </div>
@@ -222,28 +221,12 @@ export default function Layout({ children }: LayoutProps) {
               <Menu className="w-6 h-6" />
             </button>
             <div className="flex items-center">
-              {logoUrl ? (
-                <img 
-                  src={logoUrl} 
-                  alt={settings.site_name}
-                  className="w-6 h-6 mr-2 object-contain"
-                  style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
-                />
-              ) : (
-                <svg width="24" height="24" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg" className="mr-2">
-                  <g clipPath="url(#clip0_527_160)">
-                    <path d="M50 0H22.4756V11.3524H50V0Z" fill="#2563eb"/>
-                    <path d="M11.4446 0.488987L22.3685 11.4596V26.6248L11.4791 15.6888L11.4446 0.488987Z" fill="#2563eb"/>
-                    <path d="M0 5.22794L11.273 15.4953V27.4973L0.204714 16.3816L0 5.22794Z" fill="#2563eb"/>
-                    <path d="M22.1967 50H11.2729V27.4974H49.5V38.7478H22.1967V50Z" fill="#2563eb"/>
-                  </g>
-                  <defs>
-                    <clipPath id="clip0_527_160">
-                      <rect width="50" height="50" fill="white"/>
-                    </clipPath>
-                  </defs>
-                </svg>
-              )}
+              <img 
+              src="/ficon.svg" 
+                alt={settings.site_name}
+                className="w-6 h-6 mr-2 object-contain"
+                style={{ filter: themeMode === 'dark' ? undefined : 'brightness(0) saturate(100%) invert(59%) sepia(78%) saturate(7488%) hue-rotate(252deg) brightness(95%) contrast(94%)' }}
+              />
               <h1 className="text-lg font-bold text-gray-900 dark:text-white">{settings.site_name}</h1>
             </div>
             <div className="w-6 h-6" /> {/* Spacer for centering */}

@@ -7,7 +7,6 @@ import {
   Play, Image, FileText, Brain, File, Eye, 
   X} from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import QuizManager from '../../components/admin/QuizManager';
 
 // --- TypeScript Fixes: Extend types locally for UI logic ---
 
@@ -77,11 +76,6 @@ export default function CourseContentManager() {
     duration_minutes: 0,
     is_published: false // Add published state for content too
   });
-
-  // Add passingScore, disableGrading, and viewAnswers state for quiz content
-  const [quizPassingScore, setQuizPassingScore] = useState<number>(70);
-  const [quizDisableGrading, setQuizDisableGrading] = useState<boolean>(false);
-  const [quizViewAnswers, setQuizViewAnswers] = useState<boolean>(false);
 
   useEffect(() => {
     if (courseId && isAdmin()) {
@@ -273,32 +267,6 @@ export default function CourseContentManager() {
       const section = sections.find(s => s.id === selectedSectionId);
       const nextOrderIndex = section ? section.content.length : 0;
 
-      // If this is a quiz content, create a quiz record first
-      let quizId = null;
-      if (newContent.content_type === 'quiz') {
-        const { data: quizData, error: quizError } = await supabase
-          .from('quizzes')
-          .insert({
-            course_id: courseId,
-            title: newContent.title,
-            description: newContent.content_data.instructions || '',
-            max_attempts: 3, // Default value
-            time_limit: newContent.duration_minutes || null,
-            created_by: profile?.id
-          })
-          .select()
-          .single();
-
-        if (quizError) throw quizError;
-        quizId = quizData.id;
-
-        // Update content_data to include the quiz_id
-        newContent.content_data = {
-          ...newContent.content_data,
-          quiz_id: quizId
-        };
-      }
-
       // If this is video content, convert URL to embed URL
       if (newContent.content_type === 'video' && newContent.content_data.url) {
         newContent.content_data = {
@@ -306,22 +274,6 @@ export default function CourseContentManager() {
           embedUrl: getEmbedUrl(newContent.content_data.url),
           originalUrl: newContent.content_data.url
         };
-      }
-
-      // Set passingScore and view_answers in content_data
-      newContent.content_data = {
-        ...newContent.content_data,
-        quiz_id: quizId,
-        passingScore: quizDisableGrading ? 0 : quizPassingScore,
-        view_answers: quizViewAnswers,
-      };
-
-      // Also update quizzes table with view_answers
-      if (newContent.content_type === 'quiz' && quizId) {
-        await supabase
-          .from('quizzes')
-          .update({ view_answers: quizViewAnswers })
-          .eq('id', quizId);
       }
 
       const { error } = await supabase
@@ -346,11 +298,6 @@ export default function CourseContentManager() {
         is_published: false
       });
       setSelectedSectionId('');
-
-      // Show success message for quiz creation
-      if (newContent.content_type === 'quiz') {
-        alert('Quiz content created successfully! You can now add questions to this quiz in the Quiz Management section.');
-      }
     } catch (error) {
       console.error('Error creating content:', error);
       alert('Failed to create content');
@@ -361,23 +308,6 @@ export default function CourseContentManager() {
     if (!editingContent || !courseId) return;
 
     try {
-      // If this is a quiz content and we have a quiz_id, update the quiz record too
-      if (editingContent.content_type === 'quiz' && editingContent.content_data.quiz_id) {
-        const { error: quizError } = await supabase
-          .from('quizzes')
-          .update({
-            title: editingContent.title,
-            description: editingContent.content_data.instructions || '',
-            time_limit: editingContent.duration_minutes || null
-          })
-          .eq('id', editingContent.content_data.quiz_id);
-
-        if (quizError) {
-          console.error('Error updating quiz:', quizError);
-          // Don't throw here, continue with content update
-        }
-      }
-
       // If this is video content, update embed URL
       if (editingContent.content_type === 'video' && editingContent.content_data.url) {
         editingContent.content_data = {
@@ -413,26 +343,6 @@ export default function CourseContentManager() {
     }
 
     try {
-      // First, get the content to check if it's a quiz
-      const { data: contentData } = await supabase
-        .from('section_content')
-        .select('*')
-        .eq('id', contentId)
-        .single();
-
-      // If it's a quiz content with a quiz_id, delete the quiz record too
-      if (contentData?.content_type === 'quiz' && contentData.content_data?.quiz_id) {
-        const { error: quizError } = await supabase
-          .from('quizzes')
-          .delete()
-          .eq('id', contentData.content_data.quiz_id);
-
-        if (quizError) {
-          console.error('Error deleting quiz:', quizError);
-          // Don't throw here, continue with content deletion
-        }
-      }
-
       const { error } = await supabase
         .from('section_content')
         .delete()
@@ -465,8 +375,6 @@ export default function CourseContentManager() {
         return <Image className="w-4 h-4 text-green-500" />;
       case 'text':
         return <FileText className="w-4 h-4 text-blue-500" />;
-      case 'quiz':
-        return <Brain className="w-4 h-4 text-purple-500" />;
       case 'file':
         return <File className="w-4 h-4 text-gray-500" />;
       default:
@@ -652,70 +560,6 @@ export default function CourseContentManager() {
                 placeholder="What does this file contain?"
               />
             </div>
-          </div>
-        );
-
-      case 'quiz':
-        return (
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quiz Instructions</label>
-              <textarea
-                value={contentData.instructions || ''}
-                onChange={(e) => updateContentData('instructions', e.target.value)}
-                rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Instructions for the quiz..."
-              />
-            </div>
-            {/* Inline QuizManager for editing existing quiz */}
-            {isEditing && content.content_data?.quiz_id && (
-              <div className="mt-6 space-y-4">
-                <QuizManager quizId={content.content_data.quiz_id} />
-                <a
-                  href={`/admin/quiz-analytics/${content.content_data.quiz_id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-lg shadow hover:bg-blue-200 dark:hover:bg-blue-800 transition font-semibold"
-                >
-                  View Full Analytics
-                </a>
-              </div>
-            )}
-
-            {/* Add UI for passingScore and disable grading */}
-            {newContent.content_type === 'quiz' && (
-              <div className="flex flex-col gap-2 mt-2">
-                <label className="block text-sm font-medium text-gray-700">Passing Score (%)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={quizPassingScore}
-                  onChange={e => setQuizPassingScore(Number(e.target.value))}
-                  disabled={quizDisableGrading}
-                  className="w-32 px-2 py-1 border border-gray-300 rounded-lg"
-                />
-                <label className="inline-flex items-center mt-1">
-                  <input
-                    type="checkbox"
-                    checked={quizDisableGrading}
-                    onChange={e => setQuizDisableGrading(e.target.checked)}
-                    className="form-checkbox h-5 w-5 text-blue-600"
-                  />
-                  <span className="ml-2 text-sm">Disable Grading (all attempts pass, pass % set to 0)</span>
-                </label>
-                <label className="inline-flex items-center mt-1">
-                  <input
-                    type="checkbox"
-                    checked={quizViewAnswers}
-                    onChange={e => setQuizViewAnswers(e.target.checked)}
-                    className="form-checkbox h-5 w-5 text-blue-600"
-                  />
-                  <span className="ml-2 text-sm">Allow learners to view correct answers after quiz</span>
-                </label>
-              </div>
-            )}
           </div>
         );
 
@@ -1050,7 +894,6 @@ export default function CourseContentManager() {
                   <option value="video">Video (Embedded)</option>
                   <option value="image">Image</option>
                   <option value="file">File/Document</option>
-                  <option value="quiz">Quiz</option>
                 </select>
               </div>
               {renderContentForm(newContent)}

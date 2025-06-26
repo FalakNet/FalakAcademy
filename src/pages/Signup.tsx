@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { usePlatformSettings } from '../hooks/usePlatformSettings';
-import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Award, CheckCircle, AlertCircle } from 'lucide-react';
+import { BookOpen, Eye, EyeOff, ArrowRight, Shield, Users, Award, CheckCircle, AlertCircle } from 'lucide-react';
 import TermsOfService from '../components/TermsOfService';
 import PrivacyPolicy from '../components/PrivacyPolicy';
 
@@ -22,9 +22,6 @@ export default function Signup() {
   
   const { user, signUp } = useAuth();
   const { settings, getAssetUrl } = usePlatformSettings();
-
-  // Add splashImageUrl definition
-  const splashImageUrl = getAssetUrl(settings.login_splash_image_url);
 
   if (user) {
     return <Navigate to="/dashboard" replace />;
@@ -58,7 +55,10 @@ export default function Signup() {
 
     setLoading(true);
 
-    try {      
+    try {
+      // Store acceptance timestamp in user metadata
+      const acceptanceTimestamp = new Date().toISOString();
+      
       await signUp(email, password, name);
       
       // Note: In a production environment, you would also want to store the acceptance
@@ -86,7 +86,6 @@ export default function Signup() {
   ];
 
   // Logo URL and color logic
-  const logoUrl = getAssetUrl(settings.site_logo_url);
   function getThemeMode() {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('theme') : null;
     if (stored === 'dark' || stored === 'light') return stored;
@@ -103,32 +102,17 @@ export default function Signup() {
         {/* Background Pattern */}
         <div className="absolute inset-0 bg-gradient-to-br from-purple-600 to-blue-700" />
         <div className="absolute inset-0 bg-black bg-opacity-20" />
-        
-        {/* Background Image Overlay */}
-        {splashImageUrl && (
-          <div 
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30"
-            style={{ backgroundImage: `url(${splashImageUrl})` }}
-          />
-        )}
-        
+                
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-center px-12 py-16 text-white">
           {/* Logo & Brand */}
           <div className="mb-12">
             <div className="flex items-center mb-6">
-              {logoUrl ? (
-                <img 
-                  src="/ficon.svg" 
-                  alt={settings.site_name}
-                  className="w-12 h-12 object-contain mr-4"
-                  style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
-                />
-              ) : (
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4">
-                  <BookOpen className="w-6 h-6 text-white" />
-                </div>
-              )}
+              <img 
+                src="/ficon.svg"
+                alt={settings.site_name}
+                className="w-12 h-12 object-contain mr-4"
+              />
               <div>
                 <h1 className="text-3xl font-bold">{settings.site_name}</h1>
                 <p className="text-white/80 text-sm">{settings.site_description}</p>
@@ -176,17 +160,16 @@ export default function Signup() {
                   <p className="text-white/80">Earn industry-recognized certificates to showcase your achievements.</p>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* Trust Indicators */}
-          <div className="mt-12 pt-8 border-t border-white/20">
-            <p className="text-white/80 text-sm mb-4">Trusted by professionals at:</p>
-            <div className="flex items-center space-x-6 text-white/60">
-              <span className="font-semibold">Microsoft</span>
-              <span className="font-semibold">Google</span>
-              <span className="font-semibold">Amazon</span>
-              <span className="font-semibold">Apple</span>
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg mb-1">Interactive Quizzes</h3>
+                  <p className="text-white/80">Test your knowledge and reinforce learning with engaging quizzes throughout your courses.</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -198,18 +181,12 @@ export default function Signup() {
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
             <div className="flex items-center justify-center mb-4">
-              {logoUrl ? (
-                <img 
-                  src="/ficon.svg"
-                  alt={settings.site_name}
-                  className="w-12 h-12 object-contain mr-3"
-                  style={{ filter: themeMode === 'dark' ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
-                />
-              ) : (
-                <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center mr-3">
-                  <BookOpen className="w-6 h-6 text-white" />
-                </div>
-              )}
+              <img 
+                src="/ficon.svg"
+                alt={settings.site_name}
+                className="w-12 h-12 object-contain mr-3"
+                style={{ filter: themeMode === 'dark' ? undefined : 'brightness(0) saturate(100%) invert(59%) sepia(78%) saturate(7488%) hue-rotate(252deg) brightness(95%) contrast(94%)' }}
+              />
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{settings.site_name}</h1>
             </div>
           </div>

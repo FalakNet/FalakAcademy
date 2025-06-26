@@ -60,25 +60,18 @@ export default function Login() {
         )}
         
         {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center px-12 py-16 text-white">
+        <div className="relative z-10 flex flex-col justify-center px-12 py-6 text-white">
           {/* Logo & Brand */}
           <div className="mb-12">
             <div className="flex items-center mb-6">
-              {logoUrl ? (
-                <img 
-                  src="/ficon.svg"
-                  alt={settings.site_name}
-                  className="w-12 h-12 object-contain mr-4"
-                  style={{ filter: isDark ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
-                />
-              ) : (
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mr-4">
-                  <BookOpen className="w-6 h-6 text-white" />
-                </div>
-              )}
+              <img 
+                src="/ficon.svg"
+                alt={settings.site_name}
+                className="w-12 h-12 object-contain mr-4"
+                style={{ filter: isDark ? undefined : 'brightness(0) saturate(100%) invert(59%) sepia(78%) saturate(7488%) hue-rotate(252deg) brightness(95%) contrast(94%)' }}
+              />
               <div>
-                <h1 className="text-3xl font-bold">{settings.site_name}</h1>
-                <p className="text-white/80 text-sm">{settings.site_description}</p>
+                <h1 className="text-4xl font-bold">{settings.site_name}</h1>
               </div>
             </div>
           </div>
@@ -106,16 +99,6 @@ export default function Login() {
 
               <div className="flex items-start space-x-4">
                 <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Users className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-lg mb-1">Expert Instructors</h3>
-                  <p className="text-white/80">Learn from industry professionals and subject matter experts.</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0">
                   <Award className="w-6 h-6 text-white" />
                 </div>
                 <div>
@@ -125,29 +108,11 @@ export default function Login() {
               </div>
             </div>
           </div>
-
-          {/* Stats */}
-          <div className="mt-12 pt-8 border-t border-white/20">
-            <div className="grid grid-cols-3 gap-8">
-              <div className="text-center">
-                <div className="text-2xl font-bold">1000+</div>
-                <div className="text-white/80 text-sm">Students</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">50+</div>
-                <div className="text-white/80 text-sm">Courses</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">95%</div>
-                <div className="text-white/80 text-sm">Success Rate</div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 lg:px-12">
+      <div className="flex-1 flex items-center justify-center px-6 py-8 lg:px-12">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden text-center mb-8">
@@ -157,7 +122,7 @@ export default function Login() {
                   src="/ficon.svg"
                   alt={settings.site_name}
                   className="w-12 h-12 object-contain mr-3"
-                  style={{ filter: isDark ? undefined : 'invert(17%) sepia(92%) saturate(7476%) hue-rotate(210deg) brightness(95%) contrast(101%)' }}
+                  style={{ filter: !isDark ? undefined : 'brightness(0) saturate(100%) invert(59%) sepia(78%) saturate(7488%) hue-rotate(252deg) brightness(95%) contrast(94%)' }}
                 />
               ) : (
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mr-3">

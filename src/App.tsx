@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { SettingsProvider } from './hooks/useSettings';
@@ -11,7 +11,6 @@ import Dashboard from './pages/Dashboard';
 import MyCourses from './pages/MyCourses';
 import AvailableCourses from './pages/AvailableCourses';
 import CourseDetail from './pages/CourseDetail';
-import QuizTaking from './pages/QuizTaking';
 import Certificates from './pages/Certificates';
 import PaymentSuccess from './pages/PaymentSuccess';
 import PaymentCancel from './pages/PaymentCancel';
@@ -19,9 +18,7 @@ import AdminUsers from './pages/admin/Users';
 import AdminCourses from './pages/admin/Courses';
 import CourseContentManager from './pages/admin/CourseContentManager';
 import CourseEnrollments from './pages/admin/CourseEnrollments';
-import AdminQuizzes from './pages/admin/Quizzes';
 import AdminSettings from './pages/admin/Settings';
-import QuizAnalytics from './pages/admin/QuizAnalytics';
 import AlertModal from './components/AlertModal';
 
 function getPwaDismissCount() {
@@ -142,16 +139,6 @@ function App() {
                   }
                 />
                 <Route
-                  path="/quiz/:quizId"
-                  element={
-                    <ProtectedRoute userOnly>
-                      <Layout>
-                        <QuizTaking />
-                      </Layout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
                   path="/certificates"
                   element={
                     <ProtectedRoute userOnly>
@@ -199,26 +186,6 @@ function App() {
                     <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
                       <Layout>
                         <CourseEnrollments />
-                      </Layout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/quizzes"
-                  element={
-                    <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
-                      <Layout>
-                        <AdminQuizzes />
-                      </Layout>
-                    </ProtectedRoute>
-                  }
-                />
-                <Route
-                  path="/admin/quiz-analytics/:quizId"
-                  element={
-                    <ProtectedRoute requiredRole="COURSE_ADMIN\" adminOnly>
-                      <Layout>
-                        <QuizAnalytics />
                       </Layout>
                     </ProtectedRoute>
                   }
